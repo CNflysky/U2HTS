@@ -260,7 +260,7 @@ static void u2hts_fetch_and_report() {
   u2hts_empty_hid_report_sent = false;
   u2hts_hid_report report = {0x00};
   report.tp_count = tp_count;
-  report.scan_time = (uint16_t)get_absolute_time();
+  report.scan_time = (uint16_t)to_ms_since_boot(time_us_64()) / 1000;
   touch_controller->operations->read_tp_data(options, report.tp, tp_count);
 #if U2HTS_LOG_LEVEL > U2HTS_LOG_LEVEL_INFO
   for (uint8_t i = 0; i < 5; i++) {

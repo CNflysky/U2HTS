@@ -23,10 +23,10 @@
 
 #if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_ERROR
 #define U2HTS_LOG_ERROR(...) \
-  do {                            \
-    printf("ERROR: ");            \
+  do {                       \
+    printf("ERROR: ");       \
     printf(__VA_ARGS__);     \
-    printf("\n");                 \
+    printf("\n");            \
   } while (0)
 #else
 #define U2HTS_LOG_ERROR
@@ -34,10 +34,10 @@
 
 #if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_WARN
 #define U2HTS_LOG_WARN(...) \
-  do {                           \
-    printf("WARN: ");            \
+  do {                      \
+    printf("WARN: ");       \
     printf(__VA_ARGS__);    \
-    printf("\n");                \
+    printf("\n");           \
   } while (0)
 #else
 #define U2HTS_LOG_WARN
@@ -45,10 +45,10 @@
 
 #if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_INFO
 #define U2HTS_LOG_INFO(...) \
-  do {                           \
-    printf("INFO: ");            \
+  do {                      \
+    printf("INFO: ");       \
     printf(__VA_ARGS__);    \
-    printf("\n");                \
+    printf("\n");           \
   } while (0)
 #else
 #define U2HTS_LOG_INFO
@@ -56,10 +56,10 @@
 
 #if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_DEBUG
 #define U2HTS_LOG_DEBUG(...) \
-  do {                            \
-    printf("DEBUG: ");            \
+  do {                       \
+    printf("DEBUG: ");       \
     printf(__VA_ARGS__);     \
-    printf("\n");                 \
+    printf("\n");            \
   } while (0)
 #else
 #define U2HTS_LOG_DEBUG
@@ -96,10 +96,11 @@
       HID_USAGE(0x48), HID_USAGE(0x49),                                        \
       HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_COLLECTION_END
 
-#define U2HTS_HID_TP_INFO_DESC                                            \
-  HID_LOGICAL_MAX_N(0xFFFF, 3), HID_REPORT_SIZE(16), HID_REPORT_COUNT(1), \
-      HID_USAGE(0x56), HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), \
-      HID_USAGE(0x54), HID_LOGICAL_MAX(10), HID_REPORT_SIZE(8),           \
+#define U2HTS_HID_TP_INFO_DESC                                                \
+  HID_LOGICAL_MAX_N(0xFFFF, 3), HID_REPORT_SIZE(16), HID_UNIT_EXPONENT(0x0C), \
+      HID_UNIT_N(0x1001, 2), HID_REPORT_COUNT(1), HID_USAGE(0x56),            \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_USAGE(0x54),     \
+      HID_LOGICAL_MAX(10), HID_REPORT_SIZE(8),                                \
       HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
 
 #define U2HTS_HID_TP_MAX_COUNT_DESC \
