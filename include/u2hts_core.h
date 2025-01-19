@@ -14,13 +14,66 @@
 #include "tusb_config.h"
 #include "u2hts_pins.h"
 
-#define U2HTS_DEBUG(...) printf(__VA_ARGS__)
+#define U2HTS_LOG_LEVEL_ERROR 0
+#define U2HTS_LOG_LEVEL_WARN 1
+#define U2HTS_LOG_LEVEL_INFO 2
+#define U2HTS_LOG_LEVEL_DEBUG 3
+
+#define U2HTS_LOG_LEVEL U2HTS_LOG_LEVEL_INFO
+
+#if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_ERROR
+#define U2HTS_LOG_ERROR(...) \
+  do {                            \
+    printf("ERROR: ");            \
+    printf(__VA_ARGS__);     \
+    printf("\n");                 \
+  } while (0)
+#else
+#define U2HTS_LOG_ERROR
+#endif
+
+#if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_WARN
+#define U2HTS_LOG_WARN(...) \
+  do {                           \
+    printf("WARN: ");            \
+    printf(__VA_ARGS__);    \
+    printf("\n");                \
+  } while (0)
+#else
+#define U2HTS_LOG_WARN
+#endif
+
+#if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_INFO
+#define U2HTS_LOG_INFO(...) \
+  do {                           \
+    printf("INFO: ");            \
+    printf(__VA_ARGS__);    \
+    printf("\n");                \
+  } while (0)
+#else
+#define U2HTS_LOG_INFO
+#endif
+
+#if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_DEBUG
+#define U2HTS_LOG_DEBUG(...) \
+  do {                            \
+    printf("DEBUG: ");            \
+    printf(__VA_ARGS__);     \
+    printf("\n");                 \
+  } while (0)
+#else
+#define U2HTS_LOG_DEBUG
+#endif
 
 #define MAP_VALUE(value, src, dest) (((value) * (dest)) / (src))
 
 #define U2HTS_LOGICAL_MAX 8192
 #define U2HTS_PHYSICAL_MAX_X 2048
 #define U2HTS_PHYSICAL_MAX_Y 2048
+
+#define U2HTS_HID_TP_REPORT_ID 1
+#define U2HTS_HID_TP_INFO_ID 2
+#define U2HTS_HID_MS_CERT_ID 3
 
 #define U2HTS_HID_TP_DESC                                                      \
   HID_USAGE(0x22), HID_COLLECTION(HID_COLLECTION_LOGICAL), HID_USAGE(0x42),    \
@@ -90,7 +143,6 @@ typedef struct {
   uint16_t x_max;
   uint16_t y_max;
   uint8_t max_tps;
-  bool irq_on_no_tp;
 } u2hts_touch_controller_config;
 
 typedef struct {
@@ -100,6 +152,7 @@ typedef struct {
   uint16_t x_max;
   uint16_t y_max;
   uint8_t max_tps;
+  uint8_t irq_flag;
 } u2hts_options;
 
 typedef struct {

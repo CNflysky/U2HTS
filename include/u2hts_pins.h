@@ -1,3 +1,11 @@
+/*
+  Copyright (C) CNflysky.
+  U2HTS stands for "USB to HID TouchScreen".
+  u2hts_pins.h: GPIO and I2C allocation.
+  This file is licensed under GPL V3.
+  All rights reserved.
+*/
+
 #ifndef _U2HTS_PINS_H_
 #define _U2HTS_PINS_H_
 

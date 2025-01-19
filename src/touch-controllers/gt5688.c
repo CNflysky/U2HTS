@@ -1,9 +1,9 @@
-/* 
+/*
   Copyright (C) CNflysky.
   U2HTS stands for "USB to HID TouchScreen".
   gt5688.c: sample driver for Goodix GT5688.
   This file is licensed under GPL V3.
-  All rights reserved. 
+  All rights reserved.
 */
 
 #include "u2hts_core.h"
