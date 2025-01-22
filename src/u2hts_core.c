@@ -10,9 +10,10 @@
 
 static u2hts_touch_controller *touch_controller = NULL;
 static u2hts_options *options = NULL;
-static bool u2hts_usb_transfer_done = false;
 static bool u2hts_irq_triggered = false;
-static bool u2hts_empty_hid_report_sent = false;
+static bool u2hts_hid_part1_tranfer_flag = false;
+static bool u2hts_hid_transfer_complete = true;
+static u2hts_hid_report u2hts_report = {0x00};
 
 static tusb_desc_device_t u2hts_device_desc = {
     .bLength = sizeof(tusb_desc_device_t),
@@ -39,7 +40,8 @@ static uint8_t u2hts_hid_desc[] = {
     HID_REPORT_ID(U2HTS_HID_TP_REPORT_ID) HID_USAGE(0x22),
     // 5 points
     U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC,
-    U2HTS_HID_TP_DESC, U2HTS_HID_TP_INFO_DESC,
+    U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC,
+    U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_INFO_DESC,
     HID_REPORT_ID(2) U2HTS_HID_TP_MAX_COUNT_DESC,
     HID_REPORT_ID(3) U2HTS_HID_TP_MS_QUALIFIED_KEY_DESC,
 
@@ -233,61 +235,57 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
           0xb7, 0xb8, 0xf4, 0xe1, 0x33, 0x08, 0x24, 0x8b, 0xc4, 0x43, 0xa5,
           0xe5, 0x24, 0xc2};
       memcpy(buffer, cert, reqlen);
-      u2hts_usb_transfer_done = true;
+      u2hts_hid_transfer_complete = true;
       return sizeof(cert);
   }
 }
 
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
                                 uint16_t len) {
-  u2hts_usb_transfer_done = true;
+  if (u2hts_hid_part1_tranfer_flag) {
+    bool ret = tud_hid_report(
+        0, (void *)((uint32_t)&u2hts_report + CFG_TUD_HID_EP_BUFSIZE - 1),
+        sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE);
+    u2hts_hid_part1_tranfer_flag = false;
+  }
+  if (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE) {
+    u2hts_hid_transfer_complete = true;
+  }
 }
 
 static void u2hts_fetch_and_report() {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
-  u2hts_usb_transfer_done = false;
+  memset(&u2hts_report, 0x00, sizeof(u2hts_report));
+  u2hts_hid_transfer_complete = false;
   uint8_t tp_count = touch_controller->operations->get_tp_count();
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
   touch_controller->operations->clear_irq();
-  // sometimes touch controller will generate interrupt multiple times while
-  // last finger has released. we just respond to first of them to avoid sending
-  // host empty hid report multiple times.
-  if (tp_count == 0 && u2hts_empty_hid_report_sent == true) {
-    u2hts_usb_transfer_done = true;
-    u2hts_irq_triggered = false;
-    return;
-  }
-  u2hts_empty_hid_report_sent = false;
-  u2hts_hid_report report = {0x00};
-  report.tp_count = tp_count;
-  report.scan_time = (uint16_t)to_ms_since_boot(time_us_64()) / 1000;
-  touch_controller->operations->read_tp_data(options, report.tp, tp_count);
+  u2hts_report.tp_count = tp_count;
+  u2hts_report.scan_time = (uint16_t)to_ms_since_boot(time_us_64()) / 1000;
+  touch_controller->operations->read_tp_data(options, u2hts_report.tp,
+                                             tp_count);
 #if U2HTS_LOG_LEVEL > U2HTS_LOG_LEVEL_INFO
-  for (uint8_t i = 0; i < 5; i++) {
+  for (uint8_t i = 0; i < 10; i++) {
     U2HTS_LOG_DEBUG(
         "report.tp[%d].contact = %d, report.tp[i].tp_coord_x = %d, "
         "report.tp[i].tp_coord_y = %d, report.tp[i].tp_height = %d, "
         "report.tp[i].tp_width = %d, report.tp[i].tp_id = %d, ",
-        i, report.tp[i].contact, report.tp[i].tp_coord_x,
-        report.tp[i].tp_coord_y, report.tp[i].tp_height, report.tp[i].tp_width,
-        report.tp[i].tp_id);
+        i, u2hts_report.tp[i].contact, u2hts_report.tp[i].tp_coord_x,
+        u2hts_report.tp[i].tp_coord_y, u2hts_report.tp[i].tp_height,
+        u2hts_report.tp[i].tp_width, u2hts_report.tp[i].tp_id);
   }
   U2HTS_LOG_DEBUG("report.scan_time = %d, report.tp_count = %d\n",
-                  report.scan_time, report.tp_count);
+                  u2hts_report.scan_time, u2hts_report.tp_count);
 #endif
-  bool ret = u2hts_usb_report(&report);
-  if (!ret) {
-    U2HTS_LOG_WARN("u2hts_usb_report failed, ret = %d", ret);
-  }
-  if (tp_count == 0) u2hts_empty_hid_report_sent = true;
-  U2HTS_LOG_DEBUG("u2hts_usb_report returns %s", ret ? "true" : "false");
+  u2hts_hid_part1_tranfer_flag = tud_hid_report(
+      U2HTS_HID_TP_REPORT_ID, &u2hts_report, CFG_TUD_HID_EP_BUFSIZE - 1);
   u2hts_irq_triggered = false;
 }
 
 void u2hts_main() {
   tud_task();
   u2hts_irq_set(true);
-  if (u2hts_usb_transfer_done) {
+  if (u2hts_hid_transfer_complete) {
     if (u2hts_irq_triggered) {
       u2hts_irq_set(false);
       u2hts_fetch_and_report();

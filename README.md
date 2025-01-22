@@ -8,8 +8,6 @@ USB HID multitouch touchscreen based on RP2040.
 | --- | --- | --- | --- |
 | Goodix | GT5688 | 10 | okay |
 
-*WIP: Maximum reported TPs is 5, due to TinyUSB HID buffer size limit.*
-
 # Circuit
 ```c
 #define U2HTS_I2C_SDA 10

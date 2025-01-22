@@ -127,7 +127,7 @@ typedef struct __packed {
 } u2hts_tp_data;
 
 typedef struct __packed {
-  u2hts_tp_data tp[5];
+  u2hts_tp_data tp[10];
   uint16_t scan_time;
   uint8_t tp_count;
 } u2hts_hid_report;
@@ -169,10 +169,6 @@ typedef struct {
   uint8_t touch_controller_name[20];
   u2hts_touch_controller_operations *operations;
 } u2hts_touch_controller;
-
-inline static bool u2hts_usb_report(u2hts_hid_report *report) {
-  return tud_hid_report(1, report, sizeof(u2hts_hid_report));
-}
 
 void u2hts_init(u2hts_touch_controller *tc, u2hts_options *opt);
 void u2hts_main();
