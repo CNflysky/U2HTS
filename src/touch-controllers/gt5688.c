@@ -141,5 +141,5 @@ u2hts_touch_controller_operations gt5688_ops = {
     .get_tp_count = &gt5688_get_tp_count,
     .get_info = &gt5688_read_info};
 
-u2hts_touch_controller gt5688 = {.touch_controller_name = "GT5688",
-                                 .operations = &gt5688_ops};
+u2hts_touch_controller gt5688 = {
+    .name = "GT5688", .operations = &gt5688_ops, .startup_delay = 50};

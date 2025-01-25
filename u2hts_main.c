@@ -11,7 +11,6 @@
 
 #define U2HTS_BI_INFO_TS_OPT_TAG 0x0000
 #define U2HTS_BI_INFO_TS_OPT_ID 0x0000
-extern u2hts_touch_controller gt5688;
 
 int main() {
   stdio_init_all();
@@ -19,8 +18,10 @@ int main() {
   // make these options can be changed with
   // `picotool config -s <opt> <val> U2HTS.uf2`
   bi_decl(bi_program_feature_group(U2HTS_BI_INFO_TS_OPT_TAG,
-                                   U2HTS_BI_INFO_TS_OPT_ID,
-                                   "Touchscreen options"));
+                                   U2HTS_BI_INFO_TS_OPT_ID, "U2HTS options"));
+  // controller selection
+  bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_OPT_TAG, U2HTS_BI_INFO_TS_OPT_ID,
+                       controller, U2HTS_TOUCH_CONTROLLER_GT5688));
   // invert X axis
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_OPT_TAG, U2HTS_BI_INFO_TS_OPT_ID,
                        x_invert, false));
@@ -45,14 +46,15 @@ int main() {
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_OPT_TAG, U2HTS_BI_INFO_TS_OPT_ID, y_max,
                        0));
 
-  u2hts_options opt = {.x_invert = x_invert,
+  u2hts_options opt = {.controller = controller,
+                       .x_invert = x_invert,
                        .y_invert = y_invert,
                        .x_y_swap = x_y_swap,
                        .max_tps = max_tps,
                        .x_max = x_max,
                        .y_max = y_max,
                        .irq_flag = irq_flag};
-  u2hts_init(&gt5688, &opt);
+  u2hts_init(&opt);
   while (1) {
     u2hts_main();
   }

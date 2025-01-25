@@ -1,7 +1,7 @@
 /*
   Copyright (C) CNflysky.
   U2HTS stands for "USB to HID TouchScreen".
-  u2hts_core.h: store data structure, macro defines.
+  u2hts_core.h: data structure, macro defines.
   This file is licensed under GPL V3.
   All rights reserved.
  */
@@ -9,10 +9,30 @@
 #ifndef _U2HTS_CORE_H_
 #define _U2HTS_CORE_H_
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+
 #include "bsp/board_api.h"
+#include "hardware/i2c.h"
+#include "pico/stdlib.h"
 #include "tusb.h"
 #include "tusb_config.h"
-#include "u2hts_pins.h"
+
+#define U2HTS_I2C i2c1
+#define U2HTS_I2C_TIMEOUT 10 * 1000  // 10ms
+
+#define U2HTS_I2C_SDA 10
+#define U2HTS_I2C_SCL 11
+#define U2HTS_TP_INT 6
+#define U2HTS_TP_RST 5
+
+#define U2HTS_DIE()       \
+  do {                    \
+    u2hts_irq_set(false); \
+    while (1);            \
+  } while (0)
 
 #define U2HTS_LOG_LEVEL_ERROR 0
 #define U2HTS_LOG_LEVEL_WARN 1
@@ -27,6 +47,7 @@
     printf("ERROR: ");       \
     printf(__VA_ARGS__);     \
     printf("\n");            \
+    U2HTS_DIE();             \
   } while (0)
 #else
 #define U2HTS_LOG_ERROR
@@ -75,18 +96,17 @@
 #define U2HTS_HID_TP_INFO_ID 2
 #define U2HTS_HID_MS_CERT_ID 3
 
-#define U2HTS_HID_TP_DESC                                                      \
+#define U2HTS_HID_TP_1ST_DESC                                                  \
   HID_USAGE(0x22), HID_COLLECTION(HID_COLLECTION_LOGICAL), HID_USAGE(0x42),    \
-      HID_LOGICAL_MIN(0), HID_LOGICAL_MAX(1), HID_REPORT_SIZE(1),              \
-      HID_REPORT_COUNT(1), HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),  \
-      HID_REPORT_COUNT(7),                                                     \
+      HID_LOGICAL_MAX(1), HID_REPORT_SIZE(1), HID_REPORT_COUNT(1),             \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_REPORT_COUNT(7),  \
       HID_INPUT(HID_CONSTANT | HID_VARIABLE | HID_ABSOLUTE),                   \
       HID_REPORT_SIZE(8), HID_USAGE(0x51), HID_REPORT_COUNT(1),                \
       HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                       \
       HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),                                  \
       HID_LOGICAL_MAX_N(U2HTS_LOGICAL_MAX, 2), HID_REPORT_SIZE(16),            \
       HID_UNIT_EXPONENT(0x0e), HID_UNIT(0x11), HID_USAGE(HID_USAGE_DESKTOP_X), \
-      HID_PHYSICAL_MIN(0), HID_PHYSICAL_MAX_N(U2HTS_PHYSICAL_MAX_X, 2),        \
+      HID_PHYSICAL_MAX_N(U2HTS_PHYSICAL_MAX_X, 2),                             \
       HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                       \
       HID_PHYSICAL_MAX_N(U2HTS_PHYSICAL_MAX_Y, 2),                             \
       HID_USAGE(HID_USAGE_DESKTOP_Y),                                          \
@@ -94,6 +114,27 @@
       HID_USAGE_PAGE(HID_USAGE_PAGE_DIGITIZER), HID_LOGICAL_MAX_N(255, 2),     \
       HID_PHYSICAL_MAX_N(255, 2), HID_REPORT_SIZE(8), HID_REPORT_COUNT(2),     \
       HID_USAGE(0x48), HID_USAGE(0x49),                                        \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_COLLECTION_END
+
+// reduced unnessary bits.
+#define U2HTS_HID_TP_DESC                                                     \
+  HID_USAGE(0x22), HID_COLLECTION(HID_COLLECTION_LOGICAL), HID_USAGE(0x42),   \
+      HID_LOGICAL_MAX(1), HID_REPORT_SIZE(1), HID_REPORT_COUNT(1),            \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_REPORT_COUNT(7), \
+      HID_INPUT(HID_CONSTANT | HID_VARIABLE | HID_ABSOLUTE),                  \
+      HID_REPORT_SIZE(8), HID_USAGE(0x51), HID_REPORT_COUNT(1),               \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                      \
+      HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),                                 \
+      HID_LOGICAL_MAX_N(U2HTS_LOGICAL_MAX, 2), HID_REPORT_SIZE(16),           \
+      HID_USAGE(HID_USAGE_DESKTOP_X),                                         \
+      HID_PHYSICAL_MAX_N(U2HTS_PHYSICAL_MAX_X, 2),                            \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                      \
+      HID_PHYSICAL_MAX_N(U2HTS_PHYSICAL_MAX_Y, 2),                            \
+      HID_USAGE(HID_USAGE_DESKTOP_Y),                                         \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                      \
+      HID_USAGE_PAGE(HID_USAGE_PAGE_DIGITIZER), HID_LOGICAL_MAX_N(255, 2),    \
+      HID_PHYSICAL_MAX_N(255, 2), HID_REPORT_SIZE(8), HID_REPORT_COUNT(2),    \
+      HID_USAGE(0x48), HID_USAGE(0x49),                                       \
       HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_COLLECTION_END
 
 #define U2HTS_HID_TP_INFO_DESC                                                \
@@ -111,11 +152,28 @@
       HID_REPORT_COUNT_N(256, 3),                                          \
       HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
 
-void u2hts_i2c_write(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
-                     uint32_t len);
+inline static void u2hts_pins_init() {
+  gpio_set_function(U2HTS_I2C_SCL, GPIO_FUNC_I2C);
+  gpio_set_function(U2HTS_I2C_SDA, GPIO_FUNC_I2C);
+  gpio_pull_up(U2HTS_I2C_SDA);
+  gpio_pull_up(U2HTS_I2C_SCL);
 
-void u2hts_i2c_read(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
-                    uint32_t len);
+  i2c_init(U2HTS_I2C, 100 * 1000);
+
+  gpio_init(U2HTS_TP_RST);
+  gpio_pull_up(U2HTS_TP_RST);
+
+  gpio_pull_up(U2HTS_TP_INT);
+}
+
+inline static void u2hts_tprst_set(bool value) {
+  gpio_put(U2HTS_TP_RST, value);
+}
+
+// add new controllers here
+typedef enum {
+  U2HTS_TOUCH_CONTROLLER_GT5688,
+} u2hts_touch_controller_list;
 
 typedef struct __packed {
   bool contact;
@@ -147,6 +205,7 @@ typedef struct {
 } u2hts_touch_controller_config;
 
 typedef struct {
+  u2hts_touch_controller_list controller;
   bool x_y_swap;
   bool x_invert;
   bool y_invert;
@@ -166,10 +225,15 @@ typedef struct {
 } u2hts_touch_controller_operations;
 
 typedef struct {
-  uint8_t touch_controller_name[20];
+  uint8_t name[20];
   u2hts_touch_controller_operations *operations;
+  uint16_t startup_delay;
 } u2hts_touch_controller;
 
-void u2hts_init(u2hts_touch_controller *tc, u2hts_options *opt);
+void u2hts_init(u2hts_options *opt);
 void u2hts_main();
+void u2hts_i2c_write(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
+                     uint32_t len);
+void u2hts_i2c_read(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
+                    uint32_t len);
 #endif

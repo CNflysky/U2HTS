@@ -8,6 +8,10 @@
 
 #include "u2hts_core.h"
 
+// touch controllers
+extern u2hts_touch_controller gt5688;
+
+// global variables
 static u2hts_touch_controller *touch_controller = NULL;
 static u2hts_options *options = NULL;
 static bool u2hts_irq_triggered = false;
@@ -37,12 +41,13 @@ static tusb_desc_device_t u2hts_device_desc = {
 static uint8_t u2hts_hid_desc[] = {
     HID_USAGE_PAGE(HID_USAGE_PAGE_DIGITIZER), HID_USAGE(0x04),
     HID_COLLECTION(HID_COLLECTION_APPLICATION),
-    HID_REPORT_ID(U2HTS_HID_TP_REPORT_ID) HID_USAGE(0x22),
-    // 5 points
+    HID_REPORT_ID(U2HTS_HID_TP_REPORT_ID) HID_USAGE(0x22), HID_PHYSICAL_MIN(0),
+    HID_LOGICAL_MIN(0),
+    // 10 points
+    U2HTS_HID_TP_1ST_DESC /* it contain UNIT info*/, U2HTS_HID_TP_DESC,
     U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC,
     U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC,
-    U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_INFO_DESC,
-    HID_REPORT_ID(2) U2HTS_HID_TP_MAX_COUNT_DESC,
+    U2HTS_HID_TP_INFO_DESC, HID_REPORT_ID(2) U2HTS_HID_TP_MAX_COUNT_DESC,
     HID_REPORT_ID(3) U2HTS_HID_TP_MS_QUALIFIED_KEY_DESC,
 
     HID_COLLECTION_END};
@@ -62,7 +67,7 @@ static uint8_t config_desc[] = {
 
 static uint8_t const *string_desc_arr[] = {
     (const char[]){0x09, 0x04},  // 0: is supported language is English (0x0409)
-    "Raspberry Pi",              // 1: Manufacturer
+    "U2HTS",                     // 1: Manufacturer
     "USB to HID Touchscreen",    // 2: Product
     NULL,                        // 3: Serials will use unique ID if possible
 };
@@ -89,15 +94,72 @@ static void u2hts_irq_set(bool enable) {
                                      u2hts_irq_cb);
 }
 
-void u2hts_init(u2hts_touch_controller *tc, u2hts_options *opt) {
+void u2hts_i2c_write(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
+                     uint32_t len) {
+  uint8_t tx_buf[len + sizeof(reg_start_addr)];
+  memset(tx_buf, 0x00, sizeof(tx_buf));
+  union {
+    uint16_t val;
+    struct {
+      uint8_t lsb;
+      uint8_t msb;
+    };
+  } data_u;
+  data_u.val = reg_start_addr;
+  tx_buf[0] = data_u.msb;
+  tx_buf[1] = data_u.lsb;
+  memcpy(tx_buf + sizeof(reg_start_addr), data, len);
+  int32_t ret = i2c_write_timeout_us(U2HTS_I2C, slave_addr, tx_buf,
+                                     sizeof(tx_buf), false, U2HTS_I2C_TIMEOUT);
+  if (ret != sizeof(tx_buf) || ret < 0)
+    U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d\n", __func__,
+                    reg_start_addr, ret);
+}
+
+void u2hts_i2c_read(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
+                    uint32_t len) {
+  uint8_t tx_buf[sizeof(reg_start_addr)];
+  memset(tx_buf, 0x00, sizeof(tx_buf));
+  union {
+    uint16_t val;
+    struct {
+      uint8_t lsb;
+      uint8_t msb;
+    };
+  } data_u;
+  data_u.val = reg_start_addr;
+  tx_buf[0] = data_u.msb;
+  tx_buf[1] = data_u.lsb;
+  int32_t ret = i2c_write_timeout_us(U2HTS_I2C, slave_addr, tx_buf,
+                                     sizeof(tx_buf), false, U2HTS_I2C_TIMEOUT);
+  if (ret != sizeof(tx_buf) || ret < 0)
+    U2HTS_LOG_ERROR("%s write error, addr = 0x%x, ret = %d\n", __func__,
+                    reg_start_addr, ret);
+
+  ret = i2c_read_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)data, len, false,
+                            U2HTS_I2C_TIMEOUT);
+  if (ret != len || ret < 0)
+    U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d\n", __func__,
+                    reg_start_addr, ret);
+}
+
+void u2hts_init(u2hts_options *opt) {
+  switch (opt->controller) {
+    case U2HTS_TOUCH_CONTROLLER_GT5688:
+      touch_controller = &gt5688;
+      break;
+    default:
+      U2HTS_LOG_ERROR("NO TOUCH CONTROLLER SELECTED!");
+      break;
+  }
   U2HTS_LOG_DEBUG("Enter %s", __func__);
-  U2HTS_LOG_INFO("U2HTS for %s, Built @ %s %s", tc->touch_controller_name,
+  U2HTS_LOG_INFO("U2HTS for %s, Built @ %s %s", touch_controller->name,
                  __DATE__, __TIME__);
-  touch_controller = tc;
+
   // reset controller first
   touch_controller->operations->reset();
   // wait for controller reset complete
-  sleep_ms(50);
+  sleep_ms(touch_controller->startup_delay);
   options = opt;
   u2hts_touch_controller_config tc_config =
       touch_controller->operations->get_config();
@@ -243,7 +305,7 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
                                 uint16_t len) {
   if (u2hts_hid_part1_tranfer_flag) {
-    bool ret = tud_hid_report(
+    tud_hid_report(
         0, (void *)((uint32_t)&u2hts_report + CFG_TUD_HID_EP_BUFSIZE - 1),
         sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE);
     u2hts_hid_part1_tranfer_flag = false;
@@ -264,7 +326,6 @@ static void u2hts_fetch_and_report() {
   u2hts_report.scan_time = (uint16_t)to_ms_since_boot(time_us_64()) / 1000;
   touch_controller->operations->read_tp_data(options, u2hts_report.tp,
                                              tp_count);
-#if U2HTS_LOG_LEVEL > U2HTS_LOG_LEVEL_INFO
   for (uint8_t i = 0; i < 10; i++) {
     U2HTS_LOG_DEBUG(
         "report.tp[%d].contact = %d, report.tp[i].tp_coord_x = %d, "
@@ -276,7 +337,6 @@ static void u2hts_fetch_and_report() {
   }
   U2HTS_LOG_DEBUG("report.scan_time = %d, report.tp_count = %d\n",
                   u2hts_report.scan_time, u2hts_report.tp_count);
-#endif
   u2hts_hid_part1_tranfer_flag = tud_hid_report(
       U2HTS_HID_TP_REPORT_ID, &u2hts_report, CFG_TUD_HID_EP_BUFSIZE - 1);
   u2hts_irq_triggered = false;
