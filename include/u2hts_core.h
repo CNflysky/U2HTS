@@ -88,6 +88,11 @@
 
 #define MAP_VALUE(value, src, dest) (((value) * (dest)) / (src))
 
+#define SET_BIT(val, bit, set) \
+  ((set) ? ((val) |= (1U << (bit))) : ((val) &= ~(1U << (bit))))
+
+#define CHECK_BIT(val, bit) (((val) & (1 << (bit))) != 0)
+
 #define U2HTS_LOGICAL_MAX 8192
 #define U2HTS_PHYSICAL_MAX_X 2048
 #define U2HTS_PHYSICAL_MAX_Y 2048

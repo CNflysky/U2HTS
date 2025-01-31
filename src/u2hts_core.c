@@ -19,7 +19,7 @@ static bool u2hts_hid_part1_tranfer_flag = false;
 static bool u2hts_hid_transfer_complete = true;
 static u2hts_hid_report u2hts_report = {0x00};
 static u2hts_hid_report u2hts_previous_report = {0x00};
-static bool u2hts_tp_ids[10] = {false};
+static uint16_t u2hts_tp_ids_mask = 0;
 
 static tusb_desc_device_t u2hts_device_desc = {
     .bLength = sizeof(tusb_desc_device_t),
@@ -319,6 +319,12 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
 
 static void u2hts_fetch_and_report() {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
+  u2hts_touch_controller_operations *ops = touch_controller->operations;
+  uint8_t tp_count = ops->get_tp_count();
+  U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
+  ops->clear_irq();
+  u2hts_irq_triggered = false;
+  if (tp_count == 0) return;
 
   memset(&u2hts_report, 0x00, sizeof(u2hts_report));
   for (uint8_t i = 0; i < sizeof(u2hts_report.tp) / sizeof(u2hts_tp_data);
@@ -326,37 +332,33 @@ static void u2hts_fetch_and_report() {
     u2hts_report.tp[i].contact = false;
     u2hts_report.tp[i].tp_id = 0xFF;
   }
-
-  uint8_t tp_count = touch_controller->operations->get_tp_count();
-  U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
-  touch_controller->operations->clear_irq();
-  u2hts_irq_triggered = false;
-  if (tp_count == 0) return;
   u2hts_hid_transfer_complete = false;
-  u2hts_report.scan_time = (uint16_t)to_ms_since_boot(time_us_64()) / 1000;
-  touch_controller->operations->read_tp_data(options, u2hts_report.tp,
-                                             tp_count);
-  bool new_ids[10] = {false};
-  for (uint8_t i = 0; i < sizeof(u2hts_report.tp) / sizeof(u2hts_tp_data);
-       i++) {
-    if (u2hts_report.tp[i].tp_id != 0xFF)
-      new_ids[u2hts_report.tp[i].tp_id] = true;
+  u2hts_report.scan_time = (uint16_t)(to_ms_since_boot(time_us_64()) / 1000);
+  ops->read_tp_data(options, u2hts_report.tp, tp_count);
+
+  uint16_t new_ids_mask = 0;
+  for (uint8_t i = 0; i < tp_count; i++) {
+    uint8_t id = u2hts_report.tp[i].tp_id;
+    if (id < 16) {  // bits of uint16_t
+      SET_BIT(new_ids_mask, id, 1);
+    }
   }
 
-  for (uint8_t i = 0; i < sizeof(u2hts_tp_ids); i++) {
-    if (!new_ids[i] && u2hts_tp_ids[i]) {
+  uint16_t released_ids_mask = u2hts_tp_ids_mask & ~new_ids_mask;
+  for (uint8_t i = 0; i < 10; i++) {
+    if (CHECK_BIT(released_ids_mask, i)) {
       for (uint8_t j = 0;
            j < sizeof(u2hts_previous_report.tp) / sizeof(u2hts_tp_data); j++) {
         if (u2hts_previous_report.tp[j].tp_id == i) {
           u2hts_previous_report.tp[j].contact = false;
-          memcpy(&u2hts_report.tp[tp_count], &u2hts_previous_report.tp[j],
-                 sizeof(u2hts_tp_data));
+          u2hts_report.tp[tp_count] = u2hts_previous_report.tp[j];
           tp_count++;
+          break;
         }
       }
     }
   }
-  memcpy(&u2hts_tp_ids, &new_ids, sizeof(u2hts_tp_ids));
+  u2hts_tp_ids_mask = new_ids_mask;
   u2hts_report.tp_count = tp_count;
 
   for (uint8_t i = 0; i < sizeof(u2hts_report.tp) / sizeof(u2hts_tp_data);
@@ -373,7 +375,7 @@ static void u2hts_fetch_and_report() {
                   u2hts_report.scan_time, u2hts_report.tp_count);
   u2hts_hid_part1_tranfer_flag = tud_hid_report(
       U2HTS_HID_TP_REPORT_ID, &u2hts_report, CFG_TUD_HID_EP_BUFSIZE - 1);
-  memcpy(&u2hts_previous_report, &u2hts_report, sizeof(u2hts_report));
+  u2hts_previous_report = u2hts_report;
 }
 
 void u2hts_main() {
