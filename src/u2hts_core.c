@@ -44,13 +44,13 @@ static uint8_t u2hts_hid_desc[] = {
     HID_USAGE_PAGE(HID_USAGE_PAGE_DIGITIZER), HID_USAGE(0x04),
     HID_COLLECTION(HID_COLLECTION_APPLICATION),
     HID_REPORT_ID(U2HTS_HID_TP_REPORT_ID) HID_USAGE(0x22), HID_PHYSICAL_MIN(0),
-    HID_LOGICAL_MIN(0),
+    HID_LOGICAL_MIN(0), HID_UNIT_EXPONENT(0x0e), HID_UNIT(0x11),
     // 10 points
-    U2HTS_HID_TP_1ST_DESC /* it contain UNIT info*/, U2HTS_HID_TP_DESC,
     U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC,
     U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC,
-    U2HTS_HID_TP_INFO_DESC, HID_REPORT_ID(2) U2HTS_HID_TP_MAX_COUNT_DESC,
-    HID_REPORT_ID(3) U2HTS_HID_TP_MS_QUALIFIED_KEY_DESC,
+    U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_INFO_DESC,
+    HID_REPORT_ID(2) U2HTS_HID_TP_MAX_COUNT_DESC,
+    HID_REPORT_ID(3) U2HTS_HID_TP_MS_THQA_CERT_DESC,
 
     HID_COLLECTION_END};
 
@@ -99,17 +99,8 @@ static void u2hts_irq_set(bool enable) {
 void u2hts_i2c_write(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
                      uint32_t len) {
   uint8_t tx_buf[len + sizeof(reg_start_addr)];
-  memset(tx_buf, 0x00, sizeof(tx_buf));
-  union {
-    uint16_t val;
-    struct {
-      uint8_t lsb;
-      uint8_t msb;
-    };
-  } data_u;
-  data_u.val = reg_start_addr;
-  tx_buf[0] = data_u.msb;
-  tx_buf[1] = data_u.lsb;
+  reg_start_addr = U2HTS_SWAP16(reg_start_addr);
+  memcpy(tx_buf, &reg_start_addr, sizeof(reg_start_addr));
   memcpy(tx_buf + sizeof(reg_start_addr), data, len);
   int32_t ret = i2c_write_timeout_us(U2HTS_I2C, slave_addr, tx_buf,
                                      sizeof(tx_buf), false, U2HTS_I2C_TIMEOUT);
@@ -121,17 +112,8 @@ void u2hts_i2c_write(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
 void u2hts_i2c_read(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
                     uint32_t len) {
   uint8_t tx_buf[sizeof(reg_start_addr)];
-  memset(tx_buf, 0x00, sizeof(tx_buf));
-  union {
-    uint16_t val;
-    struct {
-      uint8_t lsb;
-      uint8_t msb;
-    };
-  } data_u;
-  data_u.val = reg_start_addr;
-  tx_buf[0] = data_u.msb;
-  tx_buf[1] = data_u.lsb;
+  reg_start_addr = U2HTS_SWAP16(reg_start_addr);
+  memcpy(tx_buf, &reg_start_addr, sizeof(reg_start_addr));
   int32_t ret = i2c_write_timeout_us(U2HTS_I2C, slave_addr, tx_buf,
                                      sizeof(tx_buf), false, U2HTS_I2C_TIMEOUT);
   if (ret != sizeof(tx_buf) || ret < 0)
@@ -157,20 +139,11 @@ void u2hts_init(u2hts_options *opt) {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   U2HTS_LOG_INFO("U2HTS for %s, Built @ %s %s", touch_controller->name,
                  __DATE__, __TIME__);
-
-  // reset controller first
-  touch_controller->operations->reset();
-  // wait for controller reset complete
-  sleep_ms(touch_controller->startup_delay);
+  // setup controller
+  touch_controller->operations->setup();
   options = opt;
   u2hts_touch_controller_config tc_config =
       touch_controller->operations->get_config();
-  u2hts_touch_controller_info tc_info =
-      touch_controller->operations->get_info();
-  U2HTS_LOG_INFO(
-      "Controller info: product_id = %s, cid = %d, patch_ver = %s, mask_ver = "
-      "%s",
-      tc_info.product_id, tc_info.cid, tc_info.patch_ver, tc_info.mask_ver);
   U2HTS_LOG_INFO(
       "Controller config: config_ver = %d, max_tps = %d, x_max = %d, y_max = "
       "%d",
@@ -272,7 +245,9 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
     case U2HTS_HID_TP_INFO_ID:
       buffer[0] = options->max_tps;
       return 1;
-    case U2HTS_HID_MS_CERT_ID:
+    case U2HTS_HID_TP_MS_THQA_CERT_ID:
+      // Touch Hardware Quality Assurance cert grabbed from msdn
+      // not sure it will take effect or not, but add it here anyway
       uint8_t cert[] = {
           0xfc, 0x28, 0xfe, 0x84, 0x40, 0xcb, 0x9a, 0x87, 0x0d, 0xbe, 0x57,
           0x3c, 0xb6, 0x70, 0x09, 0x88, 0x07, 0x97, 0x2d, 0x2b, 0xe3, 0x38,
@@ -312,9 +287,8 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
         sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE);
     u2hts_hid_part1_tranfer_flag = false;
   }
-  if (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE) {
+  if (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE)
     u2hts_hid_transfer_complete = true;
-  }
 }
 
 static void u2hts_fetch_and_report() {
@@ -327,11 +301,8 @@ static void u2hts_fetch_and_report() {
   if (tp_count == 0) return;
 
   memset(&u2hts_report, 0x00, sizeof(u2hts_report));
-  for (uint8_t i = 0; i < sizeof(u2hts_report.tp) / sizeof(u2hts_tp_data);
-       i++) {
-    u2hts_report.tp[i].contact = false;
-    u2hts_report.tp[i].tp_id = 0xFF;
-  }
+  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].tp_id = 0xFF;
+
   u2hts_hid_transfer_complete = false;
   u2hts_report.scan_time = (uint16_t)(to_ms_since_boot(time_us_64()) / 1000);
   ops->read_tp_data(options, u2hts_report.tp, tp_count);
@@ -339,16 +310,13 @@ static void u2hts_fetch_and_report() {
   uint16_t new_ids_mask = 0;
   for (uint8_t i = 0; i < tp_count; i++) {
     uint8_t id = u2hts_report.tp[i].tp_id;
-    if (id < 16) {  // bits of uint16_t
-      SET_BIT(new_ids_mask, id, 1);
-    }
+    if (id < U2HTS_MAX_TPS) U2HTS_SET_BIT(new_ids_mask, id, 1);
   }
 
   uint16_t released_ids_mask = u2hts_tp_ids_mask & ~new_ids_mask;
-  for (uint8_t i = 0; i < 10; i++) {
-    if (CHECK_BIT(released_ids_mask, i)) {
-      for (uint8_t j = 0;
-           j < sizeof(u2hts_previous_report.tp) / sizeof(u2hts_tp_data); j++) {
+  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) {
+    if (U2HTS_CHECK_BIT(released_ids_mask, i)) {
+      for (uint8_t j = 0; j < U2HTS_MAX_TPS; j++) {
         if (u2hts_previous_report.tp[j].tp_id == i) {
           u2hts_previous_report.tp[j].contact = false;
           u2hts_report.tp[tp_count] = u2hts_previous_report.tp[j];
@@ -361,8 +329,7 @@ static void u2hts_fetch_and_report() {
   u2hts_tp_ids_mask = new_ids_mask;
   u2hts_report.tp_count = tp_count;
 
-  for (uint8_t i = 0; i < sizeof(u2hts_report.tp) / sizeof(u2hts_tp_data);
-       i++) {
+  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) {
     U2HTS_LOG_DEBUG(
         "report.tp[%d].contact = %d, report.tp[i].tp_coord_x = %d, "
         "report.tp[i].tp_coord_y = %d, report.tp[i].tp_height = %d, "

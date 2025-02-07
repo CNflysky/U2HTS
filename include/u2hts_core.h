@@ -9,11 +9,6 @@
 #ifndef _U2HTS_CORE_H_
 #define _U2HTS_CORE_H_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <strings.h>
-
 #include "bsp/board_api.h"
 #include "hardware/i2c.h"
 #include "pico/stdlib.h"
@@ -86,12 +81,16 @@
 #define U2HTS_LOG_DEBUG
 #endif
 
-#define MAP_VALUE(value, src, dest) (((value) * (dest)) / (src))
+#define U2HTS_MAP_VALUE(value, src, dest) (((value) * (dest)) / (src))
 
-#define SET_BIT(val, bit, set) \
+#define U2HTS_SET_BIT(val, bit, set) \
   ((set) ? ((val) |= (1U << (bit))) : ((val) &= ~(1U << (bit))))
 
-#define CHECK_BIT(val, bit) (((val) & (1 << (bit))) != 0)
+#define U2HTS_CHECK_BIT(val, bit) (((val) & (1 << (bit))) != 0)
+
+#define U2HTS_SWAP16(x) __builtin_bswap16(x)
+
+#define U2HTS_MAX_TPS 10
 
 #define U2HTS_LOGICAL_MAX 8192
 #define U2HTS_PHYSICAL_MAX_X 2048
@@ -99,29 +98,8 @@
 
 #define U2HTS_HID_TP_REPORT_ID 1
 #define U2HTS_HID_TP_INFO_ID 2
-#define U2HTS_HID_MS_CERT_ID 3
+#define U2HTS_HID_TP_MS_THQA_CERT_ID 3
 
-#define U2HTS_HID_TP_1ST_DESC                                                  \
-  HID_USAGE(0x22), HID_COLLECTION(HID_COLLECTION_LOGICAL), HID_USAGE(0x42),    \
-      HID_LOGICAL_MAX(1), HID_REPORT_SIZE(1), HID_REPORT_COUNT(1),             \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_REPORT_COUNT(7),  \
-      HID_INPUT(HID_CONSTANT | HID_VARIABLE | HID_ABSOLUTE),                   \
-      HID_REPORT_SIZE(8), HID_USAGE(0x51), HID_REPORT_COUNT(1),                \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                       \
-      HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),                                  \
-      HID_LOGICAL_MAX_N(U2HTS_LOGICAL_MAX, 2), HID_REPORT_SIZE(16),            \
-      HID_UNIT_EXPONENT(0x0e), HID_UNIT(0x11), HID_USAGE(HID_USAGE_DESKTOP_X), \
-      HID_PHYSICAL_MAX_N(U2HTS_PHYSICAL_MAX_X, 2),                             \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                       \
-      HID_PHYSICAL_MAX_N(U2HTS_PHYSICAL_MAX_Y, 2),                             \
-      HID_USAGE(HID_USAGE_DESKTOP_Y),                                          \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                       \
-      HID_USAGE_PAGE(HID_USAGE_PAGE_DIGITIZER), HID_LOGICAL_MAX_N(255, 2),     \
-      HID_PHYSICAL_MAX_N(255, 2), HID_REPORT_SIZE(8), HID_REPORT_COUNT(2),     \
-      HID_USAGE(0x48), HID_USAGE(0x49),                                        \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_COLLECTION_END
-
-// reduced unnessary bits.
 #define U2HTS_HID_TP_DESC                                                     \
   HID_USAGE(0x22), HID_COLLECTION(HID_COLLECTION_LOGICAL), HID_USAGE(0x42),   \
       HID_LOGICAL_MAX(1), HID_REPORT_SIZE(1), HID_REPORT_COUNT(1),            \
@@ -152,7 +130,7 @@
 #define U2HTS_HID_TP_MAX_COUNT_DESC \
   HID_USAGE(0x55), HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
 
-#define U2HTS_HID_TP_MS_QUALIFIED_KEY_DESC                                 \
+#define U2HTS_HID_TP_MS_THQA_CERT_DESC                                     \
   HID_USAGE_PAGE_N(0XFF00, 2), HID_USAGE(0xc5), HID_LOGICAL_MAX_N(255, 2), \
       HID_REPORT_COUNT_N(256, 3),                                          \
       HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
@@ -190,17 +168,10 @@ typedef struct __packed {
 } u2hts_tp_data;
 
 typedef struct __packed {
-  u2hts_tp_data tp[10];
+  u2hts_tp_data tp[U2HTS_MAX_TPS];
   uint16_t scan_time;
   uint8_t tp_count;
 } u2hts_hid_report;
-
-typedef struct {
-  uint8_t product_id[16];
-  uint8_t cid;
-  uint8_t patch_ver[16];
-  uint8_t mask_ver[16];
-} u2hts_touch_controller_info;
 
 typedef struct {
   uint8_t config_ver;
@@ -221,9 +192,8 @@ typedef struct {
 } u2hts_options;
 
 typedef struct {
-  void (*reset)();
+  void (*setup)();
   void (*clear_irq)();
-  u2hts_touch_controller_info (*get_info)();
   u2hts_touch_controller_config (*get_config)();
   uint8_t (*get_tp_count)();
   void (*read_tp_data)(u2hts_options *opt, u2hts_tp_data *tp, uint8_t tp_count);
@@ -232,7 +202,6 @@ typedef struct {
 typedef struct {
   uint8_t name[20];
   u2hts_touch_controller_operations *operations;
-  uint16_t startup_delay;
 } u2hts_touch_controller;
 
 void u2hts_init(u2hts_options *opt);

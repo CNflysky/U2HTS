@@ -45,7 +45,6 @@ int main() {
   // max Y coordinate
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_OPT_TAG, U2HTS_BI_INFO_TS_OPT_ID, y_max,
                        0));
-
   u2hts_options opt = {.controller = controller,
                        .x_invert = x_invert,
                        .y_invert = y_invert,
@@ -55,7 +54,5 @@ int main() {
                        .y_max = y_max,
                        .irq_flag = irq_flag};
   u2hts_init(&opt);
-  while (1) {
-    u2hts_main();
-  }
+  while (1) u2hts_main();
 }
