@@ -9,7 +9,7 @@
 #include "u2hts_core.h"
 
 // touch controllers
-extern u2hts_touch_controller gt5688;
+extern u2hts_touch_controller goodix;
 
 // global variables
 static u2hts_touch_controller *touch_controller = NULL;
@@ -96,41 +96,59 @@ static void u2hts_irq_set(bool enable) {
                                      u2hts_irq_cb);
 }
 
-void u2hts_i2c_write(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
-                     uint32_t len) {
-  uint8_t tx_buf[len + sizeof(reg_start_addr)];
-  reg_start_addr = U2HTS_SWAP16(reg_start_addr);
-  memcpy(tx_buf, &reg_start_addr, sizeof(reg_start_addr));
-  memcpy(tx_buf + sizeof(reg_start_addr), data, len);
+void u2hts_i2c_write(uint8_t slave_addr, uint32_t reg, size_t reg_size,
+                     void *data, size_t data_size) {
+  uint8_t tx_buf[reg_size + data_size];
+  uint32_t reg_be = 0x00;
+  switch (reg_size) {
+    case sizeof(uint16_t):
+      reg_be = U2HTS_SWAP16(reg);
+      break;
+    case sizeof(uint32_t):
+      reg_be = U2HTS_SWAP32(reg);
+      break;
+    default:
+      reg_be = reg;
+      break;
+  }
+  memcpy(tx_buf, &reg_be, reg_size);
+  memcpy(tx_buf + reg_size, data, data_size);
   int32_t ret = i2c_write_timeout_us(U2HTS_I2C, slave_addr, tx_buf,
                                      sizeof(tx_buf), false, U2HTS_I2C_TIMEOUT);
   if (ret != sizeof(tx_buf) || ret < 0)
-    U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d\n", __func__,
-                    reg_start_addr, ret);
+    U2HTS_LOG_ERROR("%s error, reg = 0x%x, ret = %d\n", __func__, reg, ret);
 }
 
-void u2hts_i2c_read(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
-                    uint32_t len) {
-  uint8_t tx_buf[sizeof(reg_start_addr)];
-  reg_start_addr = U2HTS_SWAP16(reg_start_addr);
-  memcpy(tx_buf, &reg_start_addr, sizeof(reg_start_addr));
-  int32_t ret = i2c_write_timeout_us(U2HTS_I2C, slave_addr, tx_buf,
-                                     sizeof(tx_buf), false, U2HTS_I2C_TIMEOUT);
-  if (ret != sizeof(tx_buf) || ret < 0)
-    U2HTS_LOG_ERROR("%s write error, addr = 0x%x, ret = %d\n", __func__,
-                    reg_start_addr, ret);
+void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
+                    void *data, size_t data_size) {
+  uint32_t reg_be = 0x00;
+  switch (reg_size) {
+    case sizeof(uint16_t):
+      reg_be = U2HTS_SWAP16(reg);
+      break;
+    case sizeof(uint32_t):
+      reg_be = U2HTS_SWAP32(reg);
+      break;
+    default:
+      reg_be = reg;
+      break;
+  }
+  int32_t ret = i2c_write_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)&reg_be,
+                                     reg_size, false, U2HTS_I2C_TIMEOUT);
+  if (ret != reg_size || ret < 0)
+    U2HTS_LOG_ERROR("%s write error, addr = 0x%x, ret = %d\n", __func__, reg,
+                    ret);
 
-  ret = i2c_read_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)data, len, false,
-                            U2HTS_I2C_TIMEOUT);
-  if (ret != len || ret < 0)
-    U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d\n", __func__,
-                    reg_start_addr, ret);
+  ret = i2c_read_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)data, data_size,
+                            false, U2HTS_I2C_TIMEOUT);
+  if (ret != data_size || ret < 0)
+    U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d\n", __func__, reg, ret);
 }
 
 void u2hts_init(u2hts_options *opt) {
   switch (opt->controller) {
-    case U2HTS_TOUCH_CONTROLLER_GT5688:
-      touch_controller = &gt5688;
+    case U2HTS_TOUCH_CONTROLLER_GOODIX:
+      touch_controller = &goodix;
       break;
     default:
       U2HTS_LOG_ERROR("NO TOUCH CONTROLLER SELECTED!");
@@ -145,10 +163,9 @@ void u2hts_init(u2hts_options *opt) {
   u2hts_touch_controller_config tc_config =
       touch_controller->operations->get_config();
   U2HTS_LOG_INFO(
-      "Controller config: config_ver = %d, max_tps = %d, x_max = %d, y_max = "
+      "Controller config: max_tps = %d, x_max = %d, y_max = "
       "%d",
-      tc_config.config_ver, tc_config.max_tps, tc_config.x_max,
-      tc_config.y_max);
+      tc_config.max_tps, tc_config.x_max, tc_config.y_max);
 
   if (tc_config.x_max < tc_config.y_max)
     U2HTS_LOG_WARN(
@@ -164,8 +181,6 @@ void u2hts_init(u2hts_options *opt) {
       "x_invert = %d, y_invert = %d",
       options->x_max, options->y_max, options->max_tps, options->x_y_swap,
       options->x_invert, options->y_invert);
-  // clear touch controller irq
-  touch_controller->operations->clear_irq();
   tud_init(BOARD_TUD_RHPORT);
   U2HTS_LOG_DEBUG("Exit %s", __func__);
 }
@@ -294,18 +309,16 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
 static void u2hts_fetch_and_report() {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   u2hts_touch_controller_operations *ops = touch_controller->operations;
-  uint8_t tp_count = ops->get_tp_count();
-  U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
-  ops->clear_irq();
-  u2hts_irq_triggered = false;
-  if (tp_count == 0) return;
-
   memset(&u2hts_report, 0x00, sizeof(u2hts_report));
   for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].tp_id = 0xFF;
+  ops->read_tp_data(options, &u2hts_report);
 
+  uint8_t tp_count = u2hts_report.tp_count;
+  U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
+  u2hts_irq_triggered = false;
+  if (tp_count == 0) return;
   u2hts_hid_transfer_complete = false;
   u2hts_report.scan_time = (uint16_t)(to_ms_since_boot(time_us_64()) / 1000);
-  ops->read_tp_data(options, u2hts_report.tp, tp_count);
 
   uint16_t new_ids_mask = 0;
   for (uint8_t i = 0; i < tp_count; i++) {

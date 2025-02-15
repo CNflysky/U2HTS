@@ -23,10 +23,9 @@
 #define U2HTS_TP_INT 6
 #define U2HTS_TP_RST 5
 
-#define U2HTS_DIE()       \
-  do {                    \
-    u2hts_irq_set(false); \
-    while (1);            \
+#define U2HTS_DIE() \
+  do {              \
+    while (1);      \
   } while (0)
 
 #define U2HTS_LOG_LEVEL_ERROR 0
@@ -89,6 +88,8 @@
 #define U2HTS_CHECK_BIT(val, bit) (((val) & (1 << (bit))) != 0)
 
 #define U2HTS_SWAP16(x) __builtin_bswap16(x)
+
+#define U2HTS_SWAP32(x) __builtin_bswap32(x)
 
 #define U2HTS_MAX_TPS 10
 
@@ -155,7 +156,7 @@ inline static void u2hts_tprst_set(bool value) {
 
 // add new controllers here
 typedef enum {
-  U2HTS_TOUCH_CONTROLLER_GT5688,
+  U2HTS_TOUCH_CONTROLLER_GOODIX,
 } u2hts_touch_controller_list;
 
 typedef struct __packed {
@@ -174,7 +175,6 @@ typedef struct __packed {
 } u2hts_hid_report;
 
 typedef struct {
-  uint8_t config_ver;
   uint16_t x_max;
   uint16_t y_max;
   uint8_t max_tps;
@@ -193,10 +193,8 @@ typedef struct {
 
 typedef struct {
   void (*setup)();
-  void (*clear_irq)();
   u2hts_touch_controller_config (*get_config)();
-  uint8_t (*get_tp_count)();
-  void (*read_tp_data)(u2hts_options *opt, u2hts_tp_data *tp, uint8_t tp_count);
+  void (*read_tp_data)(u2hts_options *opt, u2hts_hid_report *report);
 } u2hts_touch_controller_operations;
 
 typedef struct {
@@ -206,8 +204,8 @@ typedef struct {
 
 void u2hts_init(u2hts_options *opt);
 void u2hts_main();
-void u2hts_i2c_write(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
-                     uint32_t len);
-void u2hts_i2c_read(uint8_t slave_addr, uint16_t reg_start_addr, void *data,
-                    uint32_t len);
+void u2hts_i2c_write(uint8_t slave_addr, uint32_t reg, size_t reg_size,
+                     void *data, size_t data_size);
+void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
+                    void *data, size_t data_size);
 #endif

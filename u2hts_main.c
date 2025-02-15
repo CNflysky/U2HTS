@@ -21,7 +21,7 @@ int main() {
                                    U2HTS_BI_INFO_TS_OPT_ID, "U2HTS options"));
   // controller selection
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_OPT_TAG, U2HTS_BI_INFO_TS_OPT_ID,
-                       controller, U2HTS_TOUCH_CONTROLLER_GT5688));
+                       controller, U2HTS_TOUCH_CONTROLLER_GOODIX));
   // invert X axis
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_OPT_TAG, U2HTS_BI_INFO_TS_OPT_ID,
                        x_invert, false));
