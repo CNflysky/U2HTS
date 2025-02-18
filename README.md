@@ -4,9 +4,10 @@ USB HID multitouch touchscreen based on RP2040.
 [zh_CN(简体中文)](./README_zh.md)
 
 # Touch controllers
-| Manf | Part Num | Max TPs | Auto configuration |
+| Vendor | Part Num | Max TPs | Auto configuration |
 | --- | --- | --- | --- |
 | Goodix | GT5688 | 10 | okay |
+| Synaptics | S7300B | 10 | okay |
 
 # Circuit
 ```c
@@ -33,14 +34,16 @@ You can config touchscreen via `picotool` without recompiling the binary.
 | Invert X axis | `x_invert` | 0/1 |
 | Invert Y axis | `y_invert` | 0/1 |
 | Swap X&Y axis | `x_y_swap` | 0/1 |
-| Interrupt flag | `irq_flag` | (refer to gpio.h) |
 
-At most siturations, the following configurations can be automatically obtained from touch controller, or you can manually specify them in case of auto configuration is failure: 
+Normally the following configurations can be automatically obtained from touch controller.  
+You can manually specify them too:
 | Config | Name | Value |
 | --- | --- | --- |
 | Max touch points | `max_tps` | up to 10 |
 | X axis max | `x_max` | 65535 |
 | Y axis max | `y_max` | 65535 |
+| Interrupt flag | `irq_flag` | (refer to gpio.h) |
+| I2C slave address | `i2c_addr` | 7-bit device address |
 
 Example：
 ```bash
