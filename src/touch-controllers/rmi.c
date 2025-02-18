@@ -18,8 +18,10 @@ static u2hts_touch_controller_operations rmi_ops = {
     .read_tp_data = &rmi_read_tp_data,
     .get_config = &rmi_get_config};
 
-u2hts_touch_controller rmi = {
-    .name = "Synaptics RMI", .i2c_addr = 0x2c, .operations = &rmi_ops};
+u2hts_touch_controller rmi = {.name = "Synaptics RMI",
+                              .irq_flag = GPIO_IRQ_LEVEL_LOW,
+                              .i2c_addr = 0x2c,
+                              .operations = &rmi_ops};
 
 #define RMI_PAGE_SELECT_REG 0xFF
 
@@ -209,7 +211,9 @@ static void rmi_print_product_info(rmi_product_info *info) {
 }
 
 static void rmi_read_tp_data(u2hts_options *opt, u2hts_hid_report *report) {
-  uint8_t f01_isr = rmi_f01_data_read(1);
+  // read irq reg to clear irq
+  rmi_f01_data_read(1);
+
   uint8_t tp_count = 0;
   rmi_f11_tp_data f11_data[rmi_max_tps];
   uint8_t fsd_size = (rmi_max_tps + 3) / 4;
@@ -218,41 +222,43 @@ static void rmi_read_tp_data(u2hts_options *opt, u2hts_hid_report *report) {
   rmi_i2c_read(rmi.i2c_addr, f11.data_base + fsd_size, f11_data,
                sizeof(f11_data));
 
-  for (uint8_t i = 0, u2hts_tp_data_index = 0; i < rmi_max_tps; i++) {
+  for (uint8_t i = 0, tp_index = 0; i < rmi_max_tps; i++) {
     if ((fsd & (3 << i * 2))) {
       tp_count++;
-      report->tp[u2hts_tp_data_index].contact = true;
-      report->tp[u2hts_tp_data_index].tp_id = i;
+      report->tp[tp_index].contact = true;
+      report->tp[tp_index].id = i;
 
-      report->tp[u2hts_tp_data_index].tp_coord_x =
+      report->tp[tp_index].x = (report->tp[tp_index].x > opt->x_max)
+                                   ? opt->x_max
+                                   : report->tp[tp_index].x;
+      report->tp[tp_index].y = (report->tp[tp_index].y > opt->y_max)
+                                   ? opt->y_max
+                                   : report->tp[tp_index].y;
+
+      report->tp[tp_index].x =
           U2HTS_MAP_VALUE((f11_data[i].xy_low & 0xF) | f11_data[i].x_high << 4,
                           opt->x_max, U2HTS_LOGICAL_MAX);
 
-      report->tp[u2hts_tp_data_index].tp_coord_y = U2HTS_MAP_VALUE(
+      report->tp[tp_index].y = U2HTS_MAP_VALUE(
           (f11_data[i].xy_low & 0xF0) >> 4 | f11_data[i].y_high << 4,
           opt->y_max, U2HTS_LOGICAL_MAX);
 
       if (opt->x_y_swap) {
-        report->tp[u2hts_tp_data_index].tp_coord_x ^=
-            report->tp[u2hts_tp_data_index].tp_coord_y;
-        report->tp[u2hts_tp_data_index].tp_coord_y ^=
-            report->tp[u2hts_tp_data_index].tp_coord_x;
-        report->tp[u2hts_tp_data_index].tp_coord_x ^=
-            report->tp[u2hts_tp_data_index].tp_coord_y;
+        report->tp[tp_index].x ^= report->tp[tp_index].y;
+        report->tp[tp_index].y ^= report->tp[tp_index].x;
+        report->tp[tp_index].x ^= report->tp[tp_index].y;
       }
 
       if (opt->x_invert)
-        report->tp[u2hts_tp_data_index].tp_coord_x =
-            U2HTS_LOGICAL_MAX - report->tp[u2hts_tp_data_index].tp_coord_x;
+        report->tp[tp_index].x = U2HTS_LOGICAL_MAX - report->tp[tp_index].x;
 
       if (opt->y_invert)
-        report->tp[u2hts_tp_data_index].tp_coord_y =
-            U2HTS_LOGICAL_MAX - report->tp[u2hts_tp_data_index].tp_coord_y;
+        report->tp[tp_index].y = U2HTS_LOGICAL_MAX - report->tp[tp_index].y;
 
-      report->tp[u2hts_tp_data_index].tp_width = f11_data[i].wxy & 0xF;
-      report->tp[u2hts_tp_data_index].tp_height = (f11_data[i].wxy & 0xF0) >> 4;
-      report->tp[u2hts_tp_data_index].tp_pressure = f11_data[i].z;
-      u2hts_tp_data_index++;
+      report->tp[tp_index].width = f11_data[i].wxy & 0xF;
+      report->tp[tp_index].height = (f11_data[i].wxy & 0xF0) >> 4;
+      report->tp[tp_index].pressure = f11_data[i].z;
+      tp_index++;
     }
   }
   report->tp_count = tp_count;

@@ -23,11 +23,6 @@
 #define U2HTS_TP_INT 6
 #define U2HTS_TP_RST 5
 
-#define U2HTS_DIE() \
-  do {              \
-    while (1);      \
-  } while (0)
-
 #define U2HTS_LOG_LEVEL_ERROR 0
 #define U2HTS_LOG_LEVEL_WARN 1
 #define U2HTS_LOG_LEVEL_INFO 2
@@ -40,7 +35,6 @@
     printf("ERROR: ");       \
     printf(__VA_ARGS__);     \
     printf("\n");            \
-    U2HTS_DIE();             \
   } while (0)
 #else
 #define U2HTS_LOG_ERROR
@@ -93,8 +87,8 @@
 #define U2HTS_MAX_TPS 10
 
 #define U2HTS_LOGICAL_MAX 4096
-#define U2HTS_PHYSICAL_MAX_X 1920
-#define U2HTS_PHYSICAL_MAX_Y 1080
+#define U2HTS_PHYSICAL_MAX_X 2048
+#define U2HTS_PHYSICAL_MAX_Y 2048
 
 #define U2HTS_HID_TP_REPORT_ID 1
 #define U2HTS_HID_TP_INFO_ID 2
@@ -161,16 +155,16 @@ typedef enum {
 
 typedef struct __packed {
   bool contact;
-  uint8_t tp_id;
-  uint16_t tp_coord_x;
-  uint16_t tp_coord_y;
-  uint8_t tp_width;
-  uint8_t tp_height;
-  uint8_t tp_pressure;
-} u2hts_tp_data;
+  uint8_t id;
+  uint16_t x;
+  uint16_t y;
+  uint8_t width;
+  uint8_t height;
+  uint8_t pressure;
+} u2hts_tp;
 
 typedef struct __packed {
-  u2hts_tp_data tp[U2HTS_MAX_TPS];
+  u2hts_tp tp[U2HTS_MAX_TPS];
   uint16_t scan_time;
   uint8_t tp_count;
 } u2hts_hid_report;
@@ -202,6 +196,7 @@ typedef struct {
 typedef struct {
   uint8_t name[20];
   uint8_t i2c_addr;
+  uint8_t irq_flag;
   u2hts_touch_controller_operations *operations;
 } u2hts_touch_controller;
 

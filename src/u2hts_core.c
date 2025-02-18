@@ -16,8 +16,8 @@ extern u2hts_touch_controller rmi;
 static u2hts_touch_controller *touch_controller = NULL;
 static u2hts_options *options = NULL;
 static bool u2hts_irq_triggered = false;
-static bool u2hts_hid_part1_tranfer_flag = false;
-static bool u2hts_hid_transfer_complete = true;
+static bool u2hts_remaining_data = false;
+static bool u2hts_transfer_done = true;
 static u2hts_hid_report u2hts_report = {0x00};
 static u2hts_hid_report u2hts_previous_report = {0x00};
 static uint16_t u2hts_tp_ids_mask = 0;
@@ -75,26 +75,28 @@ static uint8_t const *string_desc_arr[] = {
     NULL,                        // 3: Serials will use unique ID if possible
 };
 
-uint8_t const *tud_descriptor_device_cb(void) {
+inline uint8_t const *tud_descriptor_device_cb(void) {
   return (uint8_t const *)&u2hts_device_desc;
 }
 
-uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
+inline uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
   return (uint8_t const *)u2hts_hid_desc;
 }
 
-uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
+inline uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
   return config_desc;
 }
 
-static void u2hts_irq_set(bool enable) {
-  gpio_set_irq_enabled(U2HTS_TP_INT, options->irq_flag, enable);
+static inline void u2hts_irq_set(bool enable) {
+  gpio_set_irq_enabled(U2HTS_TP_INT, touch_controller->irq_flag, enable);
 }
 
 void u2hts_irq_cb(uint gpio, uint32_t event_mask) {
   u2hts_irq_set(false);
-  U2HTS_LOG_DEBUG("irq triggered");
-  if (gpio == U2HTS_TP_INT) u2hts_irq_triggered = true;
+  if (gpio == U2HTS_TP_INT && (event_mask & touch_controller->irq_flag)) {
+    U2HTS_LOG_DEBUG("irq triggered");
+    u2hts_irq_triggered = true;
+  }
 }
 
 void u2hts_i2c_write(uint8_t slave_addr, uint32_t reg, size_t reg_size,
@@ -147,6 +149,7 @@ void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
 }
 
 void u2hts_init(u2hts_options *opt) {
+  options = opt;
   switch (opt->controller) {
     case U2HTS_TOUCH_CONTROLLER_GOODIX:
       touch_controller = &goodix;
@@ -161,11 +164,17 @@ void u2hts_init(u2hts_options *opt) {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   U2HTS_LOG_INFO("U2HTS for %s, Built @ %s %s", touch_controller->name,
                  __DATE__, __TIME__);
-  if (!options->i2c_addr) touch_controller->i2c_addr = options->i2c_addr;
+
+  touch_controller->i2c_addr =
+      (options->i2c_addr) ? options->i2c_addr : touch_controller->i2c_addr;
+
+  touch_controller->irq_flag =
+      (options->irq_flag) ? options->irq_flag : touch_controller->irq_flag;
+
   U2HTS_LOG_INFO("Controller I2C address: 0x%x", touch_controller->i2c_addr);
+  U2HTS_LOG_INFO("Controller IRQ flag: 0x%x", touch_controller->irq_flag);
   // setup controller
   touch_controller->operations->setup();
-  options = opt;
   u2hts_touch_controller_config tc_config =
       touch_controller->operations->get_config();
   U2HTS_LOG_INFO(
@@ -179,17 +188,18 @@ void u2hts_init(u2hts_options *opt) {
         "configured as vertical. You may want to configure x_y_swap and "
         "x_invert to true on horizontal applications.");
 
-  if (!options->x_max) options->x_max = tc_config.x_max;
-  if (!options->y_max) options->y_max = tc_config.y_max;
-  if (!options->max_tps) options->max_tps = tc_config.max_tps;
+  options->x_max = (options->x_max) ? options->x_max : tc_config.x_max;
+  options->y_max = (options->y_max) ? options->y_max : tc_config.y_max;
+  options->max_tps = (options->max_tps) ? options->max_tps : tc_config.max_tps;
+
   U2HTS_LOG_INFO(
       "U2HTS options: x_max = %d, y_max=%d, max_tps = %d, x_y_swap = %d, "
       "x_invert = %d, y_invert = %d",
       options->x_max, options->y_max, options->max_tps, options->x_y_swap,
       options->x_invert, options->y_invert);
   tud_init(BOARD_TUD_RHPORT);
-  gpio_set_irq_enabled_with_callback(U2HTS_TP_INT, opt->irq_flag, true,
-                                     u2hts_irq_cb);
+  gpio_set_irq_enabled_with_callback(U2HTS_TP_INT, touch_controller->irq_flag,
+                                     true, u2hts_irq_cb);
   U2HTS_LOG_DEBUG("Exit %s", __func__);
 }
 
@@ -297,78 +307,80 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
           0xb7, 0xb8, 0xf4, 0xe1, 0x33, 0x08, 0x24, 0x8b, 0xc4, 0x43, 0xa5,
           0xe5, 0x24, 0xc2};
       memcpy(buffer, cert, reqlen);
-      u2hts_hid_transfer_complete = true;
+      u2hts_transfer_done = true;
       return sizeof(cert);
   }
 }
 
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
                                 uint16_t len) {
-  if (u2hts_hid_part1_tranfer_flag) {
+  if (u2hts_remaining_data) {
     tud_hid_report(
         0, (void *)((uint32_t)&u2hts_report + CFG_TUD_HID_EP_BUFSIZE - 1),
         sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE);
-    u2hts_hid_part1_tranfer_flag = false;
+    u2hts_remaining_data = false;
   }
   if (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE)
-    u2hts_hid_transfer_complete = true;
+    u2hts_transfer_done = true;
 }
 
 static void u2hts_fetch_and_report() {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   u2hts_touch_controller_operations *ops = touch_controller->operations;
   memset(&u2hts_report, 0x00, sizeof(u2hts_report));
-  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].tp_id = 0xFF;
+  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].id = 0xFF;
   ops->read_tp_data(options, &u2hts_report);
 
   uint8_t tp_count = u2hts_report.tp_count;
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
   u2hts_irq_triggered = false;
-  if (tp_count == 0) return;
-  u2hts_hid_transfer_complete = false;
+  if (tp_count == 0 && u2hts_previous_report.tp_count == 0) return;
+  u2hts_transfer_done = false;
   u2hts_report.scan_time = (uint16_t)(to_us_since_boot(time_us_64()) / 100);
 
-  uint16_t new_ids_mask = 0;
-  for (uint8_t i = 0; i < tp_count; i++) {
-    uint8_t id = u2hts_report.tp[i].tp_id;
-    if (id < U2HTS_MAX_TPS) U2HTS_SET_BIT(new_ids_mask, id, 1);
-  }
+  if (u2hts_previous_report.tp_count != u2hts_report.tp_count) {
+    uint16_t new_ids_mask = 0;
+    for (uint8_t i = 0; i < tp_count; i++) {
+      uint8_t id = u2hts_report.tp[i].id;
+      if (id < U2HTS_MAX_TPS) U2HTS_SET_BIT(new_ids_mask, id, 1);
+    }
 
-  uint16_t released_ids_mask = u2hts_tp_ids_mask & ~new_ids_mask;
-  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) {
-    if (U2HTS_CHECK_BIT(released_ids_mask, i)) {
-      for (uint8_t j = 0; j < U2HTS_MAX_TPS; j++) {
-        if (u2hts_previous_report.tp[j].tp_id == i) {
-          u2hts_previous_report.tp[j].contact = false;
-          u2hts_report.tp[tp_count] = u2hts_previous_report.tp[j];
-          tp_count++;
-          break;
+    uint16_t released_ids_mask = u2hts_tp_ids_mask & ~new_ids_mask;
+    for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) {
+      if (U2HTS_CHECK_BIT(released_ids_mask, i)) {
+        for (uint8_t j = 0; j < U2HTS_MAX_TPS; j++) {
+          if (u2hts_previous_report.tp[j].id == i) {
+            u2hts_previous_report.tp[j].contact = false;
+            u2hts_report.tp[tp_count] = u2hts_previous_report.tp[j];
+            tp_count++;
+            break;
+          }
         }
       }
     }
+    u2hts_tp_ids_mask = new_ids_mask;
+    u2hts_report.tp_count = tp_count;
   }
-  u2hts_tp_ids_mask = new_ids_mask;
-  u2hts_report.tp_count = tp_count;
 
   for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) {
     U2HTS_LOG_DEBUG(
-        "report.tp[%d].contact = %d, report.tp[i].tp_coord_x = %d, "
-        "report.tp[i].tp_coord_y = %d, report.tp[i].tp_height = %d, "
-        "report.tp[i].tp_width = %d, report.tp[i].tp_id = %d, ",
-        i, u2hts_report.tp[i].contact, u2hts_report.tp[i].tp_coord_x,
-        u2hts_report.tp[i].tp_coord_y, u2hts_report.tp[i].tp_height,
-        u2hts_report.tp[i].tp_width, u2hts_report.tp[i].tp_id);
+        "report.tp[%d].contact = %d, report.tp[i].x = %d, "
+        "report.tp[i].y = %d, report.tp[i].height = %d, "
+        "report.tp[i].width = %d, report.tp[i].id = %d, ",
+        i, u2hts_report.tp[i].contact, u2hts_report.tp[i].x,
+        u2hts_report.tp[i].y, u2hts_report.tp[i].height,
+        u2hts_report.tp[i].width, u2hts_report.tp[i].id);
   }
   U2HTS_LOG_DEBUG("report.scan_time = %d, report.tp_count = %d\n",
                   u2hts_report.scan_time, u2hts_report.tp_count);
-  u2hts_hid_part1_tranfer_flag = tud_hid_report(
-      U2HTS_HID_TP_REPORT_ID, &u2hts_report, CFG_TUD_HID_EP_BUFSIZE - 1);
+  u2hts_remaining_data = tud_hid_report(U2HTS_HID_TP_REPORT_ID, &u2hts_report,
+                                        CFG_TUD_HID_EP_BUFSIZE - 1);
   u2hts_previous_report = u2hts_report;
 }
 
 void u2hts_main() {
   tud_task();
   u2hts_irq_set(true);
-  if (u2hts_hid_transfer_complete)
+  if (u2hts_transfer_done)
     if (u2hts_irq_triggered) u2hts_fetch_and_report();
 }
