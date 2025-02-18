@@ -34,7 +34,6 @@
 #define U2HTS_LOG_LEVEL_DEBUG 3
 
 #define U2HTS_LOG_LEVEL U2HTS_LOG_LEVEL_INFO
-
 #if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_ERROR
 #define U2HTS_LOG_ERROR(...) \
   do {                       \
@@ -93,9 +92,9 @@
 
 #define U2HTS_MAX_TPS 10
 
-#define U2HTS_LOGICAL_MAX 8192
-#define U2HTS_PHYSICAL_MAX_X 2048
-#define U2HTS_PHYSICAL_MAX_Y 2048
+#define U2HTS_LOGICAL_MAX 4096
+#define U2HTS_PHYSICAL_MAX_X 1920
+#define U2HTS_PHYSICAL_MAX_Y 1080
 
 #define U2HTS_HID_TP_REPORT_ID 1
 #define U2HTS_HID_TP_INFO_ID 2
@@ -117,8 +116,8 @@
       HID_USAGE(HID_USAGE_DESKTOP_Y),                                         \
       HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                      \
       HID_USAGE_PAGE(HID_USAGE_PAGE_DIGITIZER), HID_LOGICAL_MAX_N(255, 2),    \
-      HID_PHYSICAL_MAX_N(255, 2), HID_REPORT_SIZE(8), HID_REPORT_COUNT(2),    \
-      HID_USAGE(0x48), HID_USAGE(0x49),                                       \
+      HID_PHYSICAL_MAX_N(255, 2), HID_REPORT_SIZE(8), HID_REPORT_COUNT(3),    \
+      HID_USAGE(0x48), HID_USAGE(0x49), HID_USAGE(0x30),                      \
       HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_COLLECTION_END
 
 #define U2HTS_HID_TP_INFO_DESC                                                \
@@ -157,6 +156,7 @@ inline static void u2hts_tprst_set(bool value) {
 // add new controllers here
 typedef enum {
   U2HTS_TOUCH_CONTROLLER_GOODIX,
+  U2HTS_TOUCH_CONTROLLER_SYNAPTICS_RMI
 } u2hts_touch_controller_list;
 
 typedef struct __packed {
@@ -166,6 +166,7 @@ typedef struct __packed {
   uint16_t tp_coord_y;
   uint8_t tp_width;
   uint8_t tp_height;
+  uint8_t tp_pressure;
 } u2hts_tp_data;
 
 typedef struct __packed {
@@ -182,6 +183,7 @@ typedef struct {
 
 typedef struct {
   u2hts_touch_controller_list controller;
+  uint8_t i2c_addr;
   bool x_y_swap;
   bool x_invert;
   bool y_invert;
@@ -199,6 +201,7 @@ typedef struct {
 
 typedef struct {
   uint8_t name[20];
+  uint8_t i2c_addr;
   u2hts_touch_controller_operations *operations;
 } u2hts_touch_controller;
 
@@ -208,4 +211,5 @@ void u2hts_i2c_write(uint8_t slave_addr, uint32_t reg, size_t reg_size,
                      void *data, size_t data_size);
 void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
                     void *data, size_t data_size);
+void u2hts_irq_cb(uint gpio, uint32_t event_mask);
 #endif

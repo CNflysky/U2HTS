@@ -22,6 +22,11 @@ int main() {
   // controller selection
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_OPT_TAG, U2HTS_BI_INFO_TS_OPT_ID,
                        controller, U2HTS_TOUCH_CONTROLLER_GOODIX));
+
+  // controller i2c address, if empty then default slave address defined in each
+  // driver will be used
+  bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_OPT_TAG, U2HTS_BI_INFO_TS_OPT_ID,
+                       i2c_addr, 0x00));
   // invert X axis
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_OPT_TAG, U2HTS_BI_INFO_TS_OPT_ID,
                        x_invert, false));
@@ -33,7 +38,7 @@ int main() {
                        x_y_swap, false));
   // interrupt flag
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_OPT_TAG, U2HTS_BI_INFO_TS_OPT_ID,
-                       irq_flag, GPIO_IRQ_EDGE_FALL));
+                       irq_flag, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_LEVEL_LOW));
   // The following 3 options are optional. If unset (0), u2hts_init() will
   // read touch controller's config to determine these values.
   // max touchpoints
@@ -46,6 +51,7 @@ int main() {
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_OPT_TAG, U2HTS_BI_INFO_TS_OPT_ID, y_max,
                        0));
   u2hts_options opt = {.controller = controller,
+                       .i2c_addr = i2c_addr,
                        .x_invert = x_invert,
                        .y_invert = y_invert,
                        .x_y_swap = x_y_swap,

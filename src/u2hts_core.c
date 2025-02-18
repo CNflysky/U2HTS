@@ -10,6 +10,7 @@
 
 // touch controllers
 extern u2hts_touch_controller goodix;
+extern u2hts_touch_controller rmi;
 
 // global variables
 static u2hts_touch_controller *touch_controller = NULL;
@@ -86,14 +87,14 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
   return config_desc;
 }
 
-static void u2hts_irq_cb(uint gpio, uint32_t event_mask) {
-  U2HTS_LOG_DEBUG("irq triggered");
-  if (gpio == U2HTS_TP_INT) u2hts_irq_triggered = true;
+static void u2hts_irq_set(bool enable) {
+  gpio_set_irq_enabled(U2HTS_TP_INT, options->irq_flag, enable);
 }
 
-static void u2hts_irq_set(bool enable) {
-  gpio_set_irq_enabled_with_callback(U2HTS_TP_INT, options->irq_flag, enable,
-                                     u2hts_irq_cb);
+void u2hts_irq_cb(uint gpio, uint32_t event_mask) {
+  u2hts_irq_set(false);
+  U2HTS_LOG_DEBUG("irq triggered");
+  if (gpio == U2HTS_TP_INT) u2hts_irq_triggered = true;
 }
 
 void u2hts_i2c_write(uint8_t slave_addr, uint32_t reg, size_t reg_size,
@@ -150,6 +151,9 @@ void u2hts_init(u2hts_options *opt) {
     case U2HTS_TOUCH_CONTROLLER_GOODIX:
       touch_controller = &goodix;
       break;
+    case U2HTS_TOUCH_CONTROLLER_SYNAPTICS_RMI:
+      touch_controller = &rmi;
+      break;
     default:
       U2HTS_LOG_ERROR("NO TOUCH CONTROLLER SELECTED!");
       break;
@@ -157,6 +161,8 @@ void u2hts_init(u2hts_options *opt) {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   U2HTS_LOG_INFO("U2HTS for %s, Built @ %s %s", touch_controller->name,
                  __DATE__, __TIME__);
+  if (!options->i2c_addr) touch_controller->i2c_addr = options->i2c_addr;
+  U2HTS_LOG_INFO("Controller I2C address: 0x%x", touch_controller->i2c_addr);
   // setup controller
   touch_controller->operations->setup();
   options = opt;
@@ -182,6 +188,8 @@ void u2hts_init(u2hts_options *opt) {
       options->x_max, options->y_max, options->max_tps, options->x_y_swap,
       options->x_invert, options->y_invert);
   tud_init(BOARD_TUD_RHPORT);
+  gpio_set_irq_enabled_with_callback(U2HTS_TP_INT, opt->irq_flag, true,
+                                     u2hts_irq_cb);
   U2HTS_LOG_DEBUG("Exit %s", __func__);
 }
 
@@ -318,7 +326,7 @@ static void u2hts_fetch_and_report() {
   u2hts_irq_triggered = false;
   if (tp_count == 0) return;
   u2hts_hid_transfer_complete = false;
-  u2hts_report.scan_time = (uint16_t)(to_ms_since_boot(time_us_64()) / 1000);
+  u2hts_report.scan_time = (uint16_t)(to_us_since_boot(time_us_64()) / 100);
 
   uint16_t new_ids_mask = 0;
   for (uint8_t i = 0; i < tp_count; i++) {
@@ -361,10 +369,6 @@ static void u2hts_fetch_and_report() {
 void u2hts_main() {
   tud_task();
   u2hts_irq_set(true);
-  if (u2hts_hid_transfer_complete) {
-    if (u2hts_irq_triggered) {
-      u2hts_irq_set(false);
-      u2hts_fetch_and_report();
-    }
-  }
+  if (u2hts_hid_transfer_complete)
+    if (u2hts_irq_triggered) u2hts_fetch_and_report();
 }
