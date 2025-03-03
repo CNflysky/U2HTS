@@ -19,13 +19,7 @@ USB HID multitouch touchscreen based on RP2040.
 No external pull-up/pull-down resistors required.  
 
 # Build
-```bash
-sudo apt install cmake git make
-git clone https://github.com/CNflysky/U2HTS.git --depth 1
-cd U2HTS
-mkdir build && cd build
-cmake .. && make -j8
-```
+Install `VS code` and `Raspberry Pi Pico` plugin, import this repository as project, then build.
 
 # Config
 You can config touchscreen via `picotool` without recompiling the binary.

@@ -17,14 +17,9 @@
 ```
 所有I/O端口直接连接即可，无需任何上/下拉电阻。  
 
-# 编译
-```bash
-sudo apt install cmake git make
-git clone https://github.com/CNflysky/U2HTS.git --depth 1
-cd U2HTS
-mkdir build && cd build
-cmake .. && make -j8
-```
+# 构建
+安装 `VS code` 和 `Raspberry Pi Pico`  插件, 导入项目后构建即可。
+
 
 # 配置
 本项目支持通过`Picotool`工具来修改触摸屏相关参数，不需要重新编译。  

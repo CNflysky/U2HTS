@@ -1,7 +1,6 @@
 /*
   Copyright (C) CNflysky.
   U2HTS stands for "USB to HID TouchScreen".
-  u2hts_core.h: data structure, macro defines.
   This file is licensed under GPL V3.
   All rights reserved.
  */
@@ -78,7 +77,7 @@
 #define U2HTS_SET_BIT(val, bit, set) \
   ((set) ? ((val) |= (1U << (bit))) : ((val) &= ~(1U << (bit))))
 
-#define U2HTS_CHECK_BIT(val, bit) (((val) & (1 << (bit))) != 0)
+#define U2HTS_CHECK_BIT(val, bit) ((val) & (1 << (bit)))
 
 #define U2HTS_SWAP16(x) __builtin_bswap16(x)
 
@@ -91,7 +90,7 @@
 #define U2HTS_PHYSICAL_MAX_Y 2048
 
 #define U2HTS_HID_TP_REPORT_ID 1
-#define U2HTS_HID_TP_INFO_ID 2
+#define U2HTS_HID_TP_MAX_COUNT_ID 2
 #define U2HTS_HID_TP_MS_THQA_CERT_ID 3
 
 #define U2HTS_HID_TP_DESC                                                     \
@@ -129,13 +128,20 @@
       HID_REPORT_COUNT_N(256, 3),                                          \
       HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
 
+#define U2HTS_TOUCH_CONTROLLER(controller)                                  \
+  __attribute__((                                                           \
+      __used__,                                                             \
+      __section__(                                                          \
+          ".u2hts_touch_controllers"))) static const u2hts_touch_controller \
+      *u2hts_touch_controller_##controller = &controller
+
 inline static void u2hts_pins_init() {
   gpio_set_function(U2HTS_I2C_SCL, GPIO_FUNC_I2C);
   gpio_set_function(U2HTS_I2C_SDA, GPIO_FUNC_I2C);
   gpio_pull_up(U2HTS_I2C_SDA);
   gpio_pull_up(U2HTS_I2C_SCL);
 
-  i2c_init(U2HTS_I2C, 100 * 1000);
+  i2c_init(U2HTS_I2C, 400 * 1000);  // 400 KHz
 
   gpio_init(U2HTS_TP_RST);
   gpio_pull_up(U2HTS_TP_RST);
@@ -146,12 +152,6 @@ inline static void u2hts_pins_init() {
 inline static void u2hts_tprst_set(bool value) {
   gpio_put(U2HTS_TP_RST, value);
 }
-
-// add new controllers here
-typedef enum {
-  U2HTS_TOUCH_CONTROLLER_GOODIX,
-  U2HTS_TOUCH_CONTROLLER_SYNAPTICS_RMI
-} u2hts_touch_controller_list;
 
 typedef struct __packed {
   bool contact;
@@ -176,7 +176,7 @@ typedef struct {
 } u2hts_touch_controller_config;
 
 typedef struct {
-  u2hts_touch_controller_list controller;
+  const uint8_t *controller_name;
   uint8_t i2c_addr;
   bool x_y_swap;
   bool x_invert;
@@ -185,22 +185,22 @@ typedef struct {
   uint16_t y_max;
   uint8_t max_tps;
   uint8_t irq_flag;
-} u2hts_options;
+} u2hts_config;
 
 typedef struct {
   void (*setup)();
   u2hts_touch_controller_config (*get_config)();
-  void (*read_tp_data)(u2hts_options *opt, u2hts_hid_report *report);
+  void (*fetch)(u2hts_config *cfg, u2hts_hid_report *report);
 } u2hts_touch_controller_operations;
 
 typedef struct {
-  uint8_t name[20];
+  uint8_t *name;
   uint8_t i2c_addr;
   uint8_t irq_flag;
   u2hts_touch_controller_operations *operations;
 } u2hts_touch_controller;
 
-void u2hts_init(u2hts_options *opt);
+void u2hts_init(u2hts_config *cfg);
 void u2hts_main();
 void u2hts_i2c_write(uint8_t slave_addr, uint32_t reg, size_t reg_size,
                      void *data, size_t data_size);

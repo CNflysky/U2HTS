@@ -1,29 +1,34 @@
 /*
   Copyright (C) CNflysky.
   U2HTS stands for "USB to HID TouchScreen".
-  u2hts_core.c: usb descriptors, interrupt callback, hid packet report, etc.
   This file is licensed under GPL V3.
   All rights reserved.
 */
 
 #include "u2hts_core.h"
 
-// touch controllers
-extern u2hts_touch_controller goodix;
-extern u2hts_touch_controller rmi;
+// will be created by linker
+extern u2hts_touch_controller *__u2hts_touch_controllers_begin;
+extern u2hts_touch_controller *__u2hts_touch_controllers_end;
 
 // global variables
 static u2hts_touch_controller *touch_controller = NULL;
-static u2hts_options *options = NULL;
-static bool u2hts_irq_triggered = false;
-static bool u2hts_remaining_data = false;
-static bool u2hts_transfer_done = true;
+static u2hts_config *config = NULL;
+
+// union u2hts_status_mask {
+//   uint8_t interrupt_status : 1;
+//   uint8_t has_remaining_data : 1;
+//   uint8_t transfer_complete : 1;
+//   uint8_t mask;
+// };
+
+static uint8_t u2hts_status_mask = 0x00;
 static u2hts_hid_report u2hts_report = {0x00};
 static u2hts_hid_report u2hts_previous_report = {0x00};
 static uint16_t u2hts_tp_ids_mask = 0;
 
-static tusb_desc_device_t u2hts_device_desc = {
-    .bLength = sizeof(tusb_desc_device_t),
+static const tusb_desc_device_t u2hts_device_desc = {
+    .bLength = sizeof(u2hts_device_desc),
     .bDescriptorType = TUSB_DESC_DEVICE,
     .bcdUSB = 0x0200,
     .bDeviceClass = 0x00,
@@ -41,7 +46,7 @@ static tusb_desc_device_t u2hts_device_desc = {
 
     .bNumConfigurations = 0x01};
 
-static uint8_t u2hts_hid_desc[] = {
+static const uint8_t u2hts_hid_desc[] = {
     HID_USAGE_PAGE(HID_USAGE_PAGE_DIGITIZER), HID_USAGE(0x04),
     HID_COLLECTION(HID_COLLECTION_APPLICATION),
     HID_REPORT_ID(U2HTS_HID_TP_REPORT_ID) HID_USAGE(0x22), HID_PHYSICAL_MIN(0),
@@ -50,14 +55,14 @@ static uint8_t u2hts_hid_desc[] = {
     U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC,
     U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC,
     U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_INFO_DESC,
-    HID_REPORT_ID(2) U2HTS_HID_TP_MAX_COUNT_DESC,
-    HID_REPORT_ID(3) U2HTS_HID_TP_MS_THQA_CERT_DESC,
+    HID_REPORT_ID(U2HTS_HID_TP_MAX_COUNT_ID) U2HTS_HID_TP_MAX_COUNT_DESC,
+    HID_REPORT_ID(U2HTS_HID_TP_MS_THQA_CERT_ID) U2HTS_HID_TP_MS_THQA_CERT_DESC,
 
     HID_COLLECTION_END};
 
 static uint16_t _desc_str[32 + 1];
 
-static uint8_t config_desc[] = {
+static const uint8_t config_desc[] = {
     // Config number, interface count, string index, total length, attribute,
     // power in mA
     TUD_CONFIG_DESCRIPTOR(1, 1, 0, TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN,
@@ -93,10 +98,10 @@ static inline void u2hts_irq_set(bool enable) {
 
 void u2hts_irq_cb(uint gpio, uint32_t event_mask) {
   u2hts_irq_set(false);
-  if (gpio == U2HTS_TP_INT && (event_mask & touch_controller->irq_flag)) {
-    U2HTS_LOG_DEBUG("irq triggered");
-    u2hts_irq_triggered = true;
-  }
+  U2HTS_LOG_DEBUG("irq triggered");
+  U2HTS_SET_BIT(
+      u2hts_status_mask, 0,
+      (gpio == U2HTS_TP_INT && (event_mask & touch_controller->irq_flag)));
 }
 
 void u2hts_i2c_write(uint8_t slave_addr, uint32_t reg, size_t reg_size,
@@ -119,7 +124,7 @@ void u2hts_i2c_write(uint8_t slave_addr, uint32_t reg, size_t reg_size,
   int32_t ret = i2c_write_timeout_us(U2HTS_I2C, slave_addr, tx_buf,
                                      sizeof(tx_buf), false, U2HTS_I2C_TIMEOUT);
   if (ret != sizeof(tx_buf) || ret < 0)
-    U2HTS_LOG_ERROR("%s error, reg = 0x%x, ret = %d\n", __func__, reg, ret);
+    U2HTS_LOG_ERROR("%s error, reg = 0x%x, ret = %d", __func__, reg, ret);
 }
 
 void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
@@ -139,37 +144,40 @@ void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
   int32_t ret = i2c_write_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)&reg_be,
                                      reg_size, false, U2HTS_I2C_TIMEOUT);
   if (ret != reg_size || ret < 0)
-    U2HTS_LOG_ERROR("%s write error, addr = 0x%x, ret = %d\n", __func__, reg,
+    U2HTS_LOG_ERROR("%s write error, addr = 0x%x, ret = %d", __func__, reg,
                     ret);
 
   ret = i2c_read_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)data, data_size,
                             false, U2HTS_I2C_TIMEOUT);
   if (ret != data_size || ret < 0)
-    U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d\n", __func__, reg, ret);
+    U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d", __func__, reg, ret);
 }
 
-void u2hts_init(u2hts_options *opt) {
-  options = opt;
-  switch (opt->controller) {
-    case U2HTS_TOUCH_CONTROLLER_GOODIX:
-      touch_controller = &goodix;
-      break;
-    case U2HTS_TOUCH_CONTROLLER_SYNAPTICS_RMI:
-      touch_controller = &rmi;
-      break;
-    default:
-      U2HTS_LOG_ERROR("NO TOUCH CONTROLLER SELECTED!");
-      break;
-  }
+static u2hts_touch_controller *u2hts_get_controller_by_name(
+    const uint8_t *name) {
+  for (u2hts_touch_controller **tc = &__u2hts_touch_controllers_begin;
+       tc < &__u2hts_touch_controllers_end; tc++)
+    if (!strcmp((*tc)->name, name)) return *tc;
+  return NULL;
+}
+
+void u2hts_init(u2hts_config *cfg) {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
-  U2HTS_LOG_INFO("U2HTS for %s, Built @ %s %s", touch_controller->name,
+  config = cfg;
+  touch_controller = u2hts_get_controller_by_name(cfg->controller_name);
+  if (!touch_controller) {
+    U2HTS_LOG_ERROR("Failed to get controller by name %s",
+                    cfg->controller_name);
+    while (1);
+  }
+  U2HTS_LOG_INFO("U2HTS for %s, built @ %s %s", touch_controller->name,
                  __DATE__, __TIME__);
 
   touch_controller->i2c_addr =
-      (options->i2c_addr) ? options->i2c_addr : touch_controller->i2c_addr;
+      (config->i2c_addr) ? config->i2c_addr : touch_controller->i2c_addr;
 
   touch_controller->irq_flag =
-      (options->irq_flag) ? options->irq_flag : touch_controller->irq_flag;
+      (config->irq_flag) ? config->irq_flag : touch_controller->irq_flag;
 
   U2HTS_LOG_INFO("Controller I2C address: 0x%x", touch_controller->i2c_addr);
   U2HTS_LOG_INFO("Controller IRQ flag: 0x%x", touch_controller->irq_flag);
@@ -188,15 +196,15 @@ void u2hts_init(u2hts_options *opt) {
         "configured as vertical. You may want to configure x_y_swap and "
         "x_invert to true on horizontal applications.");
 
-  options->x_max = (options->x_max) ? options->x_max : tc_config.x_max;
-  options->y_max = (options->y_max) ? options->y_max : tc_config.y_max;
-  options->max_tps = (options->max_tps) ? options->max_tps : tc_config.max_tps;
+  config->x_max = (config->x_max) ? config->x_max : tc_config.x_max;
+  config->y_max = (config->y_max) ? config->y_max : tc_config.y_max;
+  config->max_tps = (config->max_tps) ? config->max_tps : tc_config.max_tps;
 
   U2HTS_LOG_INFO(
-      "U2HTS options: x_max = %d, y_max=%d, max_tps = %d, x_y_swap = %d, "
+      "U2HTS config: x_max = %d, y_max=%d, max_tps = %d, x_y_swap = %d, "
       "x_invert = %d, y_invert = %d",
-      options->x_max, options->y_max, options->max_tps, options->x_y_swap,
-      options->x_invert, options->y_invert);
+      config->x_max, config->y_max, config->max_tps, config->x_y_swap,
+      config->x_invert, config->y_invert);
   tud_init(BOARD_TUD_RHPORT);
   gpio_set_irq_enabled_with_callback(U2HTS_TP_INT, touch_controller->irq_flag,
                                      true, u2hts_irq_cb);
@@ -275,8 +283,8 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
       "= %d, reqlen = %d",
       instance, report_id, report_type, reqlen);
   switch (report_id) {
-    case U2HTS_HID_TP_INFO_ID:
-      buffer[0] = options->max_tps;
+    case U2HTS_HID_TP_MAX_COUNT_ID:
+      buffer[0] = config->max_tps;
       return 1;
     case U2HTS_HID_TP_MS_THQA_CERT_ID:
       // Touch Hardware Quality Assurance cert grabbed from msdn
@@ -307,21 +315,21 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
           0xb7, 0xb8, 0xf4, 0xe1, 0x33, 0x08, 0x24, 0x8b, 0xc4, 0x43, 0xa5,
           0xe5, 0x24, 0xc2};
       memcpy(buffer, cert, reqlen);
-      u2hts_transfer_done = true;
+      U2HTS_SET_BIT(u2hts_status_mask, 2, 1);
       return sizeof(cert);
   }
 }
 
 void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
                                 uint16_t len) {
-  if (u2hts_remaining_data) {
+  if (U2HTS_CHECK_BIT(u2hts_status_mask, 1)) {
     tud_hid_report(
         0, (void *)((uint32_t)&u2hts_report + CFG_TUD_HID_EP_BUFSIZE - 1),
         sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE);
-    u2hts_remaining_data = false;
+    U2HTS_SET_BIT(u2hts_status_mask, 1, 0);
   }
-  if (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE)
-    u2hts_transfer_done = true;
+  U2HTS_SET_BIT(u2hts_status_mask, 2,
+                (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE));
 }
 
 static void u2hts_fetch_and_report() {
@@ -329,13 +337,14 @@ static void u2hts_fetch_and_report() {
   u2hts_touch_controller_operations *ops = touch_controller->operations;
   memset(&u2hts_report, 0x00, sizeof(u2hts_report));
   for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].id = 0xFF;
-  ops->read_tp_data(options, &u2hts_report);
+  ops->fetch(config, &u2hts_report);
 
   uint8_t tp_count = u2hts_report.tp_count;
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
-  u2hts_irq_triggered = false;
+  U2HTS_SET_BIT(u2hts_status_mask, 0, 0);
   if (tp_count == 0 && u2hts_previous_report.tp_count == 0) return;
-  u2hts_transfer_done = false;
+  U2HTS_SET_BIT(u2hts_status_mask, 2, 0);
+
   u2hts_report.scan_time = (uint16_t)(to_us_since_boot(time_us_64()) / 100);
 
   if (u2hts_previous_report.tp_count != u2hts_report.tp_count) {
@@ -371,16 +380,16 @@ static void u2hts_fetch_and_report() {
         u2hts_report.tp[i].y, u2hts_report.tp[i].height,
         u2hts_report.tp[i].width, u2hts_report.tp[i].id);
   }
-  U2HTS_LOG_DEBUG("report.scan_time = %d, report.tp_count = %d\n",
+  U2HTS_LOG_DEBUG("report.scan_time = %d, report.tp_count = %d",
                   u2hts_report.scan_time, u2hts_report.tp_count);
-  u2hts_remaining_data = tud_hid_report(U2HTS_HID_TP_REPORT_ID, &u2hts_report,
-                                        CFG_TUD_HID_EP_BUFSIZE - 1);
+  U2HTS_SET_BIT(u2hts_status_mask, 1,
+                tud_hid_report(U2HTS_HID_TP_REPORT_ID, &u2hts_report,
+                               CFG_TUD_HID_EP_BUFSIZE - 1));
   u2hts_previous_report = u2hts_report;
 }
 
 void u2hts_main() {
   tud_task();
   u2hts_irq_set(true);
-  if (u2hts_transfer_done)
-    if (u2hts_irq_triggered) u2hts_fetch_and_report();
+  if ((u2hts_status_mask & 0x05) == 0x05) u2hts_fetch_and_report();
 }

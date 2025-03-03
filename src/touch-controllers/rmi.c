@@ -10,18 +10,20 @@
 
 #include "u2hts_core.h"
 static void rmi_setup();
-static void rmi_read_tp_data(u2hts_options *opt, u2hts_hid_report *report);
+static void rmi_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report);
 static u2hts_touch_controller_config rmi_get_config();
 
 static u2hts_touch_controller_operations rmi_ops = {
     .setup = &rmi_setup,
-    .read_tp_data = &rmi_read_tp_data,
+    .fetch = &rmi_coord_fetch,
     .get_config = &rmi_get_config};
 
-u2hts_touch_controller rmi = {.name = "Synaptics RMI",
-                              .irq_flag = GPIO_IRQ_LEVEL_LOW,
-                              .i2c_addr = 0x2c,
-                              .operations = &rmi_ops};
+static u2hts_touch_controller rmi = {.name = "Synaptics RMI",
+                                     .irq_flag = GPIO_IRQ_LEVEL_LOW,
+                                     .i2c_addr = 0x2c,
+                                     .operations = &rmi_ops};
+
+U2HTS_TOUCH_CONTROLLER(rmi);
 
 #define RMI_PAGE_SELECT_REG 0xFF
 
@@ -71,64 +73,59 @@ static uint8_t rmi_current_page = 0xFF;
 
 static uint8_t rmi_max_tps = 0x00;
 
-inline static void rmi_set_page(uint8_t slave_addr, uint8_t page) {
-  u2hts_i2c_write(slave_addr, page, sizeof(page), NULL, 0);
+inline static void rmi_set_page(uint8_t page) {
+  u2hts_i2c_write(rmi.i2c_addr, page, sizeof(page), NULL, 0);
 }
 
-static void rmi_i2c_read(uint8_t slave_addr, uint16_t reg, void *data,
-                         size_t data_size) {
+static void rmi_i2c_read(uint16_t reg, void *data, size_t data_size) {
   if (rmi_current_page != reg >> 8) {
     uint8_t page = reg >> 8;
-    rmi_set_page(slave_addr, page);
+    rmi_set_page(page);
     rmi_current_page = page;
   }
-  u2hts_i2c_read(slave_addr, reg & 0xFF, 1, data, data_size);
+  u2hts_i2c_read(rmi.i2c_addr, reg & 0xFF, 1, data, data_size);
 }
 
-static void rmi_i2c_write(uint8_t slave_addr, uint16_t reg, void *data,
-                          size_t data_size) {
+static void rmi_i2c_write(uint16_t reg, void *data, size_t data_size) {
   if (rmi_current_page != reg >> 8) {
     uint8_t page = reg >> 8;
-    rmi_set_page(slave_addr, page);
+    rmi_set_page(page);
     rmi_current_page = page;
   }
-  u2hts_i2c_write(slave_addr, reg & 0xFF, 1, data, data_size);
+  u2hts_i2c_write(rmi.i2c_addr, reg & 0xFF, 1, data, data_size);
 }
 
 inline static uint8_t rmi_ctrl_read(rmi_pdt *pdt, uint16_t offset) {
   uint8_t payload = 0x00;
-  rmi_i2c_read(rmi.i2c_addr, pdt->ctrl_base + offset, &payload,
-               sizeof(payload));
+  rmi_i2c_read(pdt->ctrl_base + offset, &payload, sizeof(payload));
   return payload;
 }
 
 inline static uint8_t rmi_data_read(rmi_pdt *pdt, uint16_t offset) {
   uint8_t payload = 0x00;
-  rmi_i2c_read(rmi.i2c_addr, pdt->data_base + offset, &payload,
-               sizeof(payload));
+  rmi_i2c_read(pdt->data_base + offset, &payload, sizeof(payload));
   return payload;
 }
 
 inline static uint8_t rmi_cmd_read(rmi_pdt *pdt, uint16_t offset) {
   uint8_t payload = 0x00;
-  rmi_i2c_read(rmi.i2c_addr, pdt->cmd_base + offset, &payload, sizeof(payload));
+  rmi_i2c_read(pdt->cmd_base + offset, &payload, sizeof(payload));
   return payload;
 }
 
 inline static uint8_t rmi_query_read(rmi_pdt *pdt, uint16_t offset) {
   uint8_t payload = 0x00;
-  rmi_i2c_read(rmi.i2c_addr, pdt->query_base + offset, &payload,
-               sizeof(payload));
+  rmi_i2c_read(pdt->query_base + offset, &payload, sizeof(payload));
   return payload;
 }
 
 inline static void rmi_ctrl_write(rmi_pdt *pdt, uint16_t offset,
                                   uint8_t value) {
-  rmi_i2c_write(rmi.i2c_addr, pdt->ctrl_base + offset, &value, sizeof(value));
+  rmi_i2c_write(pdt->ctrl_base + offset, &value, sizeof(value));
 }
 
 inline static void rmi_cmd_write(rmi_pdt *pdt, uint16_t offset, uint8_t value) {
-  rmi_i2c_write(rmi.i2c_addr, pdt->cmd_base + offset, &value, sizeof(value));
+  rmi_i2c_write(pdt->cmd_base + offset, &value, sizeof(value));
 }
 
 inline static uint8_t rmi_f01_ctrl_read(uint16_t offset) {
@@ -185,7 +182,7 @@ static int8_t rmi_fetch_pdt(uint8_t slave_addr) {
   uint8_t f11_int_index = 0;
   for (uint8_t i = RMI_PDT_TOP; i > RMI_PDT_BOTTOM; i -= RMI_PDT_SIZE) {
     rmi_pdt pdt = {0x00};
-    rmi_i2c_read(slave_addr, i, &pdt, RMI_PDT_SIZE);
+    rmi_i2c_read(i, &pdt, RMI_PDT_SIZE);
     if (pdt.func_num > 0) pdt_int_count += pdt.func_info & 7;
     if (pdt.func_num == RMI_FUNC_F01) f01 = pdt;
     if (pdt.func_num == RMI_FUNC_F11) {
@@ -210,7 +207,7 @@ static void rmi_print_product_info(rmi_product_info *info) {
       info->prod_day, info->tester_id, info->serialno);
 }
 
-static void rmi_read_tp_data(u2hts_options *opt, u2hts_hid_report *report) {
+static void rmi_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report) {
   // read irq reg to clear irq
   rmi_f01_data_read(1);
 
@@ -218,9 +215,8 @@ static void rmi_read_tp_data(u2hts_options *opt, u2hts_hid_report *report) {
   rmi_f11_tp_data f11_data[rmi_max_tps];
   uint8_t fsd_size = (rmi_max_tps + 3) / 4;
   uint32_t fsd = 0x0;  // finger status data
-  rmi_i2c_read(rmi.i2c_addr, f11.data_base, &fsd, fsd_size);
-  rmi_i2c_read(rmi.i2c_addr, f11.data_base + fsd_size, f11_data,
-               sizeof(f11_data));
+  rmi_i2c_read(f11.data_base, &fsd, fsd_size);
+  rmi_i2c_read(f11.data_base + fsd_size, f11_data, sizeof(f11_data));
 
   for (uint8_t i = 0, tp_index = 0; i < rmi_max_tps; i++) {
     if ((fsd & (3 << i * 2))) {
@@ -228,31 +224,31 @@ static void rmi_read_tp_data(u2hts_options *opt, u2hts_hid_report *report) {
       report->tp[tp_index].contact = true;
       report->tp[tp_index].id = i;
 
-      report->tp[tp_index].x = (report->tp[tp_index].x > opt->x_max)
-                                   ? opt->x_max
+      report->tp[tp_index].x = (report->tp[tp_index].x > cfg->x_max)
+                                   ? cfg->x_max
                                    : report->tp[tp_index].x;
-      report->tp[tp_index].y = (report->tp[tp_index].y > opt->y_max)
-                                   ? opt->y_max
+      report->tp[tp_index].y = (report->tp[tp_index].y > cfg->y_max)
+                                   ? cfg->y_max
                                    : report->tp[tp_index].y;
 
       report->tp[tp_index].x =
           U2HTS_MAP_VALUE((f11_data[i].xy_low & 0xF) | f11_data[i].x_high << 4,
-                          opt->x_max, U2HTS_LOGICAL_MAX);
+                          cfg->x_max, U2HTS_LOGICAL_MAX);
 
       report->tp[tp_index].y = U2HTS_MAP_VALUE(
           (f11_data[i].xy_low & 0xF0) >> 4 | f11_data[i].y_high << 4,
-          opt->y_max, U2HTS_LOGICAL_MAX);
+          cfg->y_max, U2HTS_LOGICAL_MAX);
 
-      if (opt->x_y_swap) {
+      if (cfg->x_y_swap) {
         report->tp[tp_index].x ^= report->tp[tp_index].y;
         report->tp[tp_index].y ^= report->tp[tp_index].x;
         report->tp[tp_index].x ^= report->tp[tp_index].y;
       }
 
-      if (opt->x_invert)
+      if (cfg->x_invert)
         report->tp[tp_index].x = U2HTS_LOGICAL_MAX - report->tp[tp_index].x;
 
-      if (opt->y_invert)
+      if (cfg->y_invert)
         report->tp[tp_index].y = U2HTS_LOGICAL_MAX - report->tp[tp_index].y;
 
       report->tp[tp_index].width = f11_data[i].wxy & 0xF;
@@ -269,10 +265,8 @@ static u2hts_touch_controller_config rmi_get_config() {
   uint8_t tps = rmi_f11_query_read(1) & 0x7;
   config.max_tps = (tps <= 4) ? tps + 1 : 10;
   rmi_max_tps = config.max_tps;
-  rmi_i2c_read(rmi.i2c_addr, f11.ctrl_base + 6 /* Ctrl 6 */, &config.x_max,
-               sizeof(uint16_t));
-  rmi_i2c_read(rmi.i2c_addr, f11.ctrl_base + 8 /* Ctrl 8 */, &config.y_max,
-               sizeof(uint16_t));
+  rmi_i2c_read(f11.ctrl_base + 6, &config.x_max, sizeof(config.x_max));
+  rmi_i2c_read(f11.ctrl_base + 8, &config.y_max, sizeof(config.y_max));
   return config;
 }
 
@@ -293,9 +287,10 @@ static void rmi_setup() {
   rmi_f01_ctrl_write(0, 0x80);
 
   rmi_product_info info = {0x00};
-  rmi_i2c_read(rmi.i2c_addr, f01.query_base, &info, sizeof(info));
+  rmi_i2c_read(f01.query_base, &info, sizeof(info));
   info.product_id[10] = '\0';
-  if (info.vendor_id != 0x01)
+
+  if (!U2HTS_CHECK_BIT(info.vendor_id, 0))
     U2HTS_LOG_WARN("Not a Synaptics device, ID = 0x%x", info.vendor_id);
   if (U2HTS_CHECK_BIT(info.device_prop, 1))
     U2HTS_LOG_WARN("This device is not compliant with RMI.");
