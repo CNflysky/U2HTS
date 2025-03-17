@@ -153,7 +153,7 @@ void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
     U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d", __func__, reg, ret);
 }
 
-inline static u2hts_touch_controller *u2hts_get_controller_by_name(
+inline static u2hts_touch_controller *u2hts_get_touch_controller(
     const uint8_t *name) {
   for (u2hts_touch_controller **tc = &__u2hts_touch_controllers_begin;
        tc < &__u2hts_touch_controllers_end; tc++)
@@ -164,10 +164,9 @@ inline static u2hts_touch_controller *u2hts_get_controller_by_name(
 inline void u2hts_init(u2hts_config *cfg) {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   config = cfg;
-  touch_controller = u2hts_get_controller_by_name(cfg->controller_name);
+  touch_controller = u2hts_get_touch_controller(cfg->controller);
   if (!touch_controller) {
-    U2HTS_LOG_ERROR("Failed to get controller by name %s",
-                    cfg->controller_name);
+    U2HTS_LOG_ERROR("Failed to get controller by name %s", cfg->controller);
     while (1);
   }
   U2HTS_LOG_INFO("U2HTS for %s, built @ %s %s", touch_controller->name,

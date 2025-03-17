@@ -18,12 +18,13 @@
 所有I/O端口直接连接即可，无需任何上/下拉电阻。  
 
 # 构建
-安装 `VS code` 和 `Raspberry Pi Pico`  插件, 导入项目后构建即可。
+安装`VS code`和`Raspberry Pi Pico`插件, 导入项目后构建即可。
 
 # 配置
-本项目支持通过`Picotool`工具来修改触摸屏相关参数，不需要重新编译。  
+本项目支持通过`Picotool`工具来修改触摸屏相关设置，不需要重新编译。  
 | 配置 | 变量名 | 可选值 |
 | --- | --- | --- |
+| 控制器 | `controller` | 参考`src/touch-controller`文件夹 |
 | 反转X轴 | `x_invert` | 0/1 |
 | 反转Y轴 | `y_invert` | 0/1 |
 | 交换XY轴 | `x_y_swap` | 0/1 |
@@ -39,6 +40,6 @@
 
 示例：
 ```bash
-picotool config -s x_invert=1 build/U2HTS.uf2
+picotool config -s x_invert 1 build/U2HTS.uf2
 picotool load -f build/U2HTS.uf2
 ```

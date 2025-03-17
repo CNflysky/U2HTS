@@ -25,6 +25,7 @@ Install `VS code` and `Raspberry Pi Pico` plugin, import this repository as proj
 You can config touchscreen via `picotool` without recompiling the binary.
 | Config | Name | Value |
 | --- | --- | --- |
+| Controller | `controller` | refer `src/touch-controllers` dir |
 | Invert X axis | `x_invert` | 0/1 |
 | Invert Y axis | `y_invert` | 0/1 |
 | Swap X&Y axis | `x_y_swap` | 0/1 |
@@ -36,11 +37,11 @@ You can manually specify them too:
 | Max touch points | `max_tps` | up to 10 |
 | X axis max | `x_max` | 65535 |
 | Y axis max | `y_max` | 65535 |
-| Interrupt flag | `irq_flag` | (refer to gpio.h) |
+| Interrupt flag | `irq_flag` | (refer `gpio.h`) |
 | I2C slave address | `i2c_addr` | 7-bit device address |
 
 Example：
 ```bash
-picotool config -s x_invert=1 build/U2HTS.uf2
+picotool config -s x_invert 1 build/U2HTS.uf2
 picotool load -f build/U2HTS.uf2
 ```

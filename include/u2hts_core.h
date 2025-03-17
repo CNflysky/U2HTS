@@ -158,7 +158,7 @@ typedef struct {
 } u2hts_touch_controller_config;
 
 typedef struct {
-  const uint8_t *controller_name;
+  const uint8_t *controller;
   uint8_t i2c_addr;
   bool x_y_swap;
   bool x_invert;
