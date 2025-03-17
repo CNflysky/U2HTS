@@ -37,7 +37,7 @@ static const tusb_desc_device_t u2hts_device_desc = {
     .bMaxPacketSize0 = CFG_TUD_ENDPOINT0_SIZE,
 
     .idVendor = 0x2e8a,   // Raspberry Pi
-    .idProduct = 0x000a,  // Pico
+    .idProduct = 0x8572,  // UH in ascii
     .bcdDevice = 0x0100,
 
     .iManufacturer = 0x01,
@@ -96,7 +96,7 @@ static inline void u2hts_irq_set(bool enable) {
   gpio_set_irq_enabled(U2HTS_TP_INT, touch_controller->irq_flag, enable);
 }
 
-void u2hts_irq_cb(uint gpio, uint32_t event_mask) {
+inline void u2hts_irq_cb(uint gpio, uint32_t event_mask) {
   u2hts_irq_set(false);
   U2HTS_LOG_DEBUG("irq triggered");
   U2HTS_SET_BIT(
@@ -153,7 +153,7 @@ void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
     U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d", __func__, reg, ret);
 }
 
-static u2hts_touch_controller *u2hts_get_controller_by_name(
+inline static u2hts_touch_controller *u2hts_get_controller_by_name(
     const uint8_t *name) {
   for (u2hts_touch_controller **tc = &__u2hts_touch_controllers_begin;
        tc < &__u2hts_touch_controllers_end; tc++)
@@ -161,7 +161,7 @@ static u2hts_touch_controller *u2hts_get_controller_by_name(
   return NULL;
 }
 
-void u2hts_init(u2hts_config *cfg) {
+inline void u2hts_init(u2hts_config *cfg) {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   config = cfg;
   touch_controller = u2hts_get_controller_by_name(cfg->controller_name);
@@ -214,7 +214,8 @@ void u2hts_init(u2hts_config *cfg) {
 // Invoked when received GET STRING DESCRIPTOR request
 // Application return pointer to descriptor, whose contents must exist long
 // enough for transfer to complete
-uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
+inline uint16_t const *tud_descriptor_string_cb(uint8_t index,
+                                                uint16_t langid) {
   (void)langid;
   size_t chr_count;
 
@@ -256,28 +257,28 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
   return _desc_str;
 }
 
-void tud_mount_cb(void) { U2HTS_LOG_DEBUG("device mounted"); }
+inline void tud_mount_cb(void) { U2HTS_LOG_DEBUG("device mounted"); }
 
-void tud_umount_cb(void) { U2HTS_LOG_DEBUG("device unmounted"); }
+inline void tud_umount_cb(void) { U2HTS_LOG_DEBUG("device unmounted"); }
 
-void tud_suspend_cb(bool remote_wakeup_en) {
+inline void tud_suspend_cb(bool remote_wakeup_en) {
   U2HTS_LOG_DEBUG("device suspended, rmt_wakeup_en = %d", remote_wakeup_en);
 }
 
-void tud_resume_cb(void) { U2HTS_LOG_DEBUG("device resumed"); }
+inline void tud_resume_cb(void) { U2HTS_LOG_DEBUG("device resumed"); }
 
-void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
-                           hid_report_type_t report_type, uint8_t const *buffer,
-                           uint16_t bufsize) {
+inline void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
+                                  hid_report_type_t report_type,
+                                  uint8_t const *buffer, uint16_t bufsize) {
   U2HTS_LOG_DEBUG(
       "Got hid set report request: instance = %d, report_id = %d, report_type "
       "= %d, busfize = %d",
       instance, report_id, report_type, bufsize);
 }
 
-uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
-                               hid_report_type_t report_type, uint8_t *buffer,
-                               uint16_t reqlen) {
+inline uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
+                                      hid_report_type_t report_type,
+                                      uint8_t *buffer, uint16_t reqlen) {
   U2HTS_LOG_DEBUG(
       "Got hid get report request: instance = %d, report_id = %d, report_type "
       "= %d, reqlen = %d",
@@ -320,8 +321,8 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
   }
 }
 
-void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
-                                uint16_t len) {
+inline void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
+                                       uint16_t len) {
   if (U2HTS_CHECK_BIT(u2hts_status_mask, 1)) {
     tud_hid_report(
         0, (void *)((uint32_t)&u2hts_report + CFG_TUD_HID_EP_BUFSIZE - 1),
@@ -332,7 +333,7 @@ void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
                 (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE));
 }
 
-static void u2hts_fetch_and_report() {
+static inline void u2hts_fetch_and_report() {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   u2hts_touch_controller_operations *ops = touch_controller->operations;
   memset(&u2hts_report, 0x00, sizeof(u2hts_report));
@@ -388,7 +389,7 @@ static void u2hts_fetch_and_report() {
   u2hts_previous_report = u2hts_report;
 }
 
-void u2hts_main() {
+inline void u2hts_main() {
   tud_task();
   u2hts_irq_set(true);
   if ((u2hts_status_mask & 0x05) == 0x05) u2hts_fetch_and_report();

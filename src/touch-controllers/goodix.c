@@ -140,8 +140,7 @@ static void goodix_setup() {
   sleep_ms(50);
 
   goodix_product_info info = {0x00};
-  goodix_i2c_read(GOODIX_PRODUCT_INFO_START_REG, &info,
-                  sizeof(info));
+  goodix_i2c_read(GOODIX_PRODUCT_INFO_START_REG, &info, sizeof(info));
   U2HTS_LOG_INFO(
       "Goodix Product ID: %c%c%c%c, CID: %d, patch_ver: %d.%d, mask_ver: "
       "%d.%d",

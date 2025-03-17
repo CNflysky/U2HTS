@@ -135,24 +135,6 @@
           ".u2hts_touch_controllers"))) static const u2hts_touch_controller \
       *u2hts_touch_controller_##controller = &controller
 
-inline static void u2hts_pins_init() {
-  gpio_set_function(U2HTS_I2C_SCL, GPIO_FUNC_I2C);
-  gpio_set_function(U2HTS_I2C_SDA, GPIO_FUNC_I2C);
-  gpio_pull_up(U2HTS_I2C_SDA);
-  gpio_pull_up(U2HTS_I2C_SCL);
-
-  i2c_init(U2HTS_I2C, 400 * 1000);  // 400 KHz
-
-  gpio_init(U2HTS_TP_RST);
-  gpio_pull_up(U2HTS_TP_RST);
-
-  gpio_pull_up(U2HTS_TP_INT);
-}
-
-inline static void u2hts_tprst_set(bool value) {
-  gpio_put(U2HTS_TP_RST, value);
-}
-
 typedef struct __packed {
   bool contact;
   uint8_t id;
@@ -199,6 +181,24 @@ typedef struct {
   uint8_t irq_flag;
   u2hts_touch_controller_operations *operations;
 } u2hts_touch_controller;
+
+inline static void u2hts_pins_init() {
+  gpio_set_function(U2HTS_I2C_SCL, GPIO_FUNC_I2C);
+  gpio_set_function(U2HTS_I2C_SDA, GPIO_FUNC_I2C);
+  gpio_pull_up(U2HTS_I2C_SDA);
+  gpio_pull_up(U2HTS_I2C_SCL);
+
+  i2c_init(U2HTS_I2C, 400 * 1000);  // 400 KHz
+
+  gpio_init(U2HTS_TP_RST);
+  gpio_pull_up(U2HTS_TP_RST);
+
+  gpio_pull_up(U2HTS_TP_INT);
+}
+
+inline static void u2hts_tprst_set(bool value) {
+  gpio_put(U2HTS_TP_RST, value);
+}
 
 void u2hts_init(u2hts_config *cfg);
 void u2hts_main();
