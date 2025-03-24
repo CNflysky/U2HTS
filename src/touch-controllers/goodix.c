@@ -134,10 +134,11 @@ static void goodix_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report) {
 }
 
 static void goodix_setup() {
+  u2hts_tpint_set(false);
   u2hts_tprst_set(false);
-  sleep_ms(100);
+  u2hts_delay_ms(100);
   u2hts_tprst_set(true);
-  sleep_ms(50);
+  u2hts_delay_ms(50);
 
   goodix_product_info info = {0x00};
   goodix_i2c_read(GOODIX_PRODUCT_INFO_START_REG, &info, sizeof(info));
@@ -148,4 +149,5 @@ static void goodix_setup() {
       info.product_id_4, info.cid, info.patch_ver_major, info.patch_ver_minor,
       info.mask_ver_major, info.mask_ver_minor);
   goodix_clear_irq();
+  u2hts_delay_ms(100);
 }

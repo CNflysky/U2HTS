@@ -190,9 +190,24 @@ inline static void u2hts_pins_init() {
 
   i2c_init(U2HTS_I2C, 400 * 1000);  // 400 KHz
 
-  gpio_init(U2HTS_TP_RST);
-  gpio_pull_up(U2HTS_TP_RST);
+  // some touch contoller requires ATTN signal in specified state while
+  // resetting.
+  gpio_set_function(U2HTS_TP_RST, GPIO_FUNC_SIO);
+  gpio_set_dir(U2HTS_TP_RST, GPIO_OUT);
+  gpio_put(U2HTS_TP_INT, 1);
 
+  gpio_set_function(U2HTS_TP_RST, GPIO_FUNC_SIO);
+  gpio_set_dir(U2HTS_TP_RST, GPIO_OUT);
+  gpio_put(U2HTS_TP_RST, 1);
+}
+
+inline static void u2hts_tpint_set(bool value) {
+  gpio_put(U2HTS_TP_INT, value);
+}
+
+// enable interrupt on TPINT pin.
+inline static void u2hts_reset_tpint() {
+  gpio_deinit(U2HTS_TP_INT);
   gpio_pull_up(U2HTS_TP_INT);
 }
 
@@ -200,6 +215,8 @@ inline static void u2hts_tprst_set(bool value) {
   gpio_put(U2HTS_TP_RST, value);
 }
 
+inline static void u2hts_delay_ms(uint32_t ms) { sleep_ms(ms); }
+inline static void u2hts_delay_us(uint32_t us) { sleep_us(us); }
 void u2hts_init(u2hts_config *cfg);
 void u2hts_main();
 void u2hts_i2c_write(uint8_t slave_addr, uint32_t reg, size_t reg_size,

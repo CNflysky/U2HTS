@@ -176,7 +176,7 @@ inline static void rmi_f11_cmd_write(uint16_t offset, uint8_t value) {
   rmi_cmd_write(&f11, offset, value);
 }
 
-static int8_t rmi_fetch_pdt(uint8_t slave_addr) {
+static int8_t rmi_fetch_pdt() {
   uint8_t empty_pdts = 0;
   uint8_t pdt_int_count = 0;
   uint8_t f11_int_index = 0;
@@ -272,16 +272,16 @@ static u2hts_touch_controller_config rmi_get_config() {
 
 static void rmi_setup() {
   u2hts_tprst_set(false);
-  sleep_ms(100);
+  u2hts_delay_ms(100);
   u2hts_tprst_set(true);
-  sleep_ms(50);
+  u2hts_delay_ms(50);
 
-  int8_t f11_index = rmi_fetch_pdt(rmi.i2c_addr);
+  int8_t f11_index = rmi_fetch_pdt();
   if (!f11_index) U2HTS_LOG_ERROR("Failed to fetch F01/F11 PDT from device");
 
   // software reset
   rmi_f01_cmd_write(0, 0x01);
-  sleep_ms(100);
+  u2hts_delay_ms(100);
 
   // write f01 ctrl reg 7 "configured" bit
   rmi_f01_ctrl_write(0, 0x80);

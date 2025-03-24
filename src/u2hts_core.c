@@ -327,6 +327,7 @@ inline void u2hts_init(u2hts_config *cfg) {
       config->x_max, config->y_max, config->max_tps, config->x_y_swap,
       config->x_invert, config->y_invert);
   tud_init(BOARD_TUD_RHPORT);
+  u2hts_reset_tpint();
   gpio_set_irq_enabled_with_callback(U2HTS_TP_INT, touch_controller->irq_flag,
                                      true, u2hts_irq_cb);
   U2HTS_LOG_DEBUG("Exit %s", __func__);
