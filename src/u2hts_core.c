@@ -4,7 +4,6 @@
   This file is licensed under GPL V3.
   All rights reserved.
 */
-
 #include "u2hts_core.h"
 
 // will be created by linker
@@ -15,17 +14,38 @@ extern u2hts_touch_controller *__u2hts_touch_controllers_end;
 static u2hts_touch_controller *touch_controller = NULL;
 static u2hts_config *config = NULL;
 
+#ifdef U2HTS_ENABLE_LED
+static u2hts_led_pattern long_flash[] = {{.state = true, .delay_ms = 1000},
+                                         {.state = false, .delay_ms = 1000}};
+
+static u2hts_led_pattern short_flash[] = {{.state = true, .delay_ms = 250},
+                                          {.state = false, .delay_ms = 250}};
+
+static u2hts_led_pattern ultrashort_flash[] = {
+    {.state = true, .delay_ms = 125}, {.state = false, .delay_ms = 125}};
+
+void u2hts_led_set(bool on);
+#endif
+
+#ifdef CFG_TUSB_MCU
 // union u2hts_status_mask {
-//   uint8_t interrupt_status : 1;
-//   uint8_t has_remaining_data : 1;
-//   uint8_t transfer_complete : 1;
+//   struct {
+//     uint8_t interrupt_status : 1;
+//     uint8_t has_remaining_data : 1;
+//     uint8_t transfer_complete : 1;
+//   };
 //   uint8_t mask;
 // };
-
 static uint8_t u2hts_status_mask = 0x00;
+#else
+static bool u2hts_irq_status = false;
+#endif
+
 static u2hts_hid_report u2hts_report = {0x00};
 static u2hts_hid_report u2hts_previous_report = {0x00};
 static uint16_t u2hts_tp_ids_mask = 0;
+
+#ifdef CFG_TUSB_MCU
 
 static const tusb_desc_device_t u2hts_device_desc = {
     .bLength = sizeof(u2hts_device_desc),
@@ -214,83 +234,50 @@ inline void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
                 (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE));
 }
 
-static inline void u2hts_irq_set(bool enable) {
-  gpio_set_irq_enabled(U2HTS_TP_INT, touch_controller->irq_flag, enable);
-}
+#endif
 
-inline void u2hts_irq_cb(uint gpio, uint32_t event_mask) {
+inline void u2hts_irq_status_set(bool status) {
   u2hts_irq_set(false);
   U2HTS_LOG_DEBUG("irq triggered");
-  U2HTS_SET_BIT(
-      u2hts_status_mask, 0,
-      (gpio == U2HTS_TP_INT && (event_mask & touch_controller->irq_flag)));
-}
-
-void u2hts_i2c_write(uint8_t slave_addr, uint32_t reg, size_t reg_size,
-                     void *data, size_t data_size) {
-  uint8_t tx_buf[reg_size + data_size];
-  uint32_t reg_be = 0x00;
-  switch (reg_size) {
-    case sizeof(uint16_t):
-      reg_be = U2HTS_SWAP16(reg);
-      break;
-    case sizeof(uint32_t):
-      reg_be = U2HTS_SWAP32(reg);
-      break;
-    default:
-      reg_be = reg;
-      break;
-  }
-  memcpy(tx_buf, &reg_be, reg_size);
-  memcpy(tx_buf + reg_size, data, data_size);
-  int32_t ret = i2c_write_timeout_us(U2HTS_I2C, slave_addr, tx_buf,
-                                     sizeof(tx_buf), false, U2HTS_I2C_TIMEOUT);
-  if (ret != sizeof(tx_buf) || ret < 0)
-    U2HTS_LOG_ERROR("%s error, reg = 0x%x, ret = %d", __func__, reg, ret);
-}
-
-void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
-                    void *data, size_t data_size) {
-  uint32_t reg_be = 0x00;
-  switch (reg_size) {
-    case sizeof(uint16_t):
-      reg_be = U2HTS_SWAP16(reg);
-      break;
-    case sizeof(uint32_t):
-      reg_be = U2HTS_SWAP32(reg);
-      break;
-    default:
-      reg_be = reg;
-      break;
-  }
-  int32_t ret = i2c_write_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)&reg_be,
-                                     reg_size, false, U2HTS_I2C_TIMEOUT);
-  if (ret != reg_size || ret < 0)
-    U2HTS_LOG_ERROR("%s write error, addr = 0x%x, ret = %d", __func__, reg,
-                    ret);
-
-  ret = i2c_read_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)data, data_size,
-                            false, U2HTS_I2C_TIMEOUT);
-  if (ret != data_size || ret < 0)
-    U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d", __func__, reg, ret);
+#ifdef CFG_TUSB_MCU
+  U2HTS_SET_BIT(u2hts_status_mask, 0, status);
+#else
+  u2hts_irq_status = status;
+#endif
 }
 
 inline static u2hts_touch_controller *u2hts_get_touch_controller(
     const uint8_t *name) {
   for (u2hts_touch_controller **tc = &__u2hts_touch_controllers_begin;
        tc < &__u2hts_touch_controllers_end; tc++)
-    if (!strcmp((*tc)->name, name)) return *tc;
+    if (!strcmp((const char *)(*tc)->name, (const char *)name)) return *tc;
   return NULL;
 }
 
 inline void u2hts_init(u2hts_config *cfg) {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   config = cfg;
+
+#ifdef U2HTS_ENABLE_PERSISTENT_CONFIG
+  if (u2hts_config_exists())
+    u2hts_load_config(config);
+  else
+    u2hts_save_config(config);
+#endif
+
   touch_controller = u2hts_get_touch_controller(cfg->controller);
   if (!touch_controller) {
     U2HTS_LOG_ERROR("Failed to get controller by name %s", cfg->controller);
-    while (1);
+    while (1)
+#ifdef U2HTS_ENABLE_LED
+      U2HTS_LED_DISPLAY_PATTERN(long_flash, 1);
+#endif
+    ;
   }
+#ifdef U2HTS_ENABLE_LED
+  else
+    U2HTS_LED_DISPLAY_PATTERN(ultrashort_flash, 2);
+#endif
   U2HTS_LOG_INFO("U2HTS for %s, built @ %s %s", touch_controller->name,
                  __DATE__, __TIME__);
 
@@ -303,7 +290,14 @@ inline void u2hts_init(u2hts_config *cfg) {
   U2HTS_LOG_INFO("Controller I2C address: 0x%x", touch_controller->i2c_addr);
   U2HTS_LOG_INFO("Controller IRQ flag: 0x%x", touch_controller->irq_flag);
   // setup controller
-  touch_controller->operations->setup();
+  if (!touch_controller->operations->setup()) {
+    U2HTS_LOG_ERROR("Failed to setup controller: %s", touch_controller->name);
+    while (1)
+#ifdef U2HTS_ENABLE_LED
+      U2HTS_LED_DISPLAY_PATTERN(short_flash, 1);
+#endif
+    ;
+  }
   u2hts_touch_controller_config tc_config =
       touch_controller->operations->get_config();
   U2HTS_LOG_INFO(
@@ -326,10 +320,9 @@ inline void u2hts_init(u2hts_config *cfg) {
       "x_invert = %d, y_invert = %d",
       config->x_max, config->y_max, config->max_tps, config->x_y_swap,
       config->x_invert, config->y_invert);
-  tud_init(BOARD_TUD_RHPORT);
-  u2hts_reset_tpint();
-  gpio_set_irq_enabled_with_callback(U2HTS_TP_INT, touch_controller->irq_flag,
-                                     true, u2hts_irq_cb);
+  u2hts_usb_init();
+  u2hts_irq_setup(touch_controller);
+
   U2HTS_LOG_DEBUG("Exit %s", __func__);
 }
 
@@ -342,11 +335,18 @@ static inline void u2hts_handle_touch() {
 
   uint8_t tp_count = u2hts_report.tp_count;
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
+#ifdef CFG_TUSB_MCU
   U2HTS_SET_BIT(u2hts_status_mask, 0, 0);
+#else
+  u2hts_irq_status = true;
+#endif
   if (tp_count == 0 && u2hts_previous_report.tp_count == 0) return;
-  U2HTS_SET_BIT(u2hts_status_mask, 2, 0);
 
-  u2hts_report.scan_time = (uint16_t)(to_us_since_boot(time_us_64()) / 100);
+#ifdef CFG_TUSB_MCU
+  U2HTS_SET_BIT(u2hts_status_mask, 2, 0);
+#endif
+
+  u2hts_report.scan_time = u2hts_get_scan_time();
 
   if (u2hts_previous_report.tp_count != u2hts_report.tp_count) {
     uint16_t new_ids_mask = 0;
@@ -383,14 +383,31 @@ static inline void u2hts_handle_touch() {
   }
   U2HTS_LOG_DEBUG("report.scan_time = %d, report.tp_count = %d",
                   u2hts_report.scan_time, u2hts_report.tp_count);
+#ifdef CFG_TUSB_MCU
   U2HTS_SET_BIT(u2hts_status_mask, 1,
-                tud_hid_report(U2HTS_HID_TP_REPORT_ID, &u2hts_report,
-                               CFG_TUD_HID_EP_BUFSIZE - 1));
+                u2hts_usb_report(&u2hts_report, U2HTS_HID_TP_REPORT_ID));
+#else
+  u2hts_report.report_id = U2HTS_HID_TP_REPORT_ID;
+  u2hts_usb_report(&u2hts_report, U2HTS_HID_TP_REPORT_ID);
+#endif
   u2hts_previous_report = u2hts_report;
 }
 
 inline void u2hts_main() {
-  tud_task();
   u2hts_irq_set(true);
-  if ((u2hts_status_mask & 0x05) == 0x05) u2hts_handle_touch();
+
+#ifdef CFG_TUSB_MCU
+  tud_task();
+#ifdef U2HTS_ENABLE_LED
+  u2hts_led_set(U2HTS_CHECK_BIT(u2hts_status_mask, 0));
+#endif
+  if ((u2hts_status_mask & 0x05) == 0x05)
+#else
+
+#ifdef U2HTS_ENABLE_LED
+  u2hts_led_set(u2hts_irq_status);
+#endif
+  if (u2hts_irq_status)
+#endif
+    u2hts_handle_touch();
 }

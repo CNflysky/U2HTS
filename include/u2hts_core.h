@@ -8,26 +8,22 @@
 #ifndef _U2HTS_CORE_H_
 #define _U2HTS_CORE_H_
 
-#include "bsp/board_api.h"
-#include "hardware/i2c.h"
-#include "pico/stdlib.h"
-#include "tusb.h"
-#include "tusb_config.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
 
-#define U2HTS_I2C i2c1
-#define U2HTS_I2C_TIMEOUT 10 * 1000  // 10ms
-
-#define U2HTS_I2C_SDA 10
-#define U2HTS_I2C_SCL 11
-#define U2HTS_TP_INT 6
-#define U2HTS_TP_RST 5
+#include "u2hts_board.h"
 
 #define U2HTS_LOG_LEVEL_ERROR 0
 #define U2HTS_LOG_LEVEL_WARN 1
 #define U2HTS_LOG_LEVEL_INFO 2
 #define U2HTS_LOG_LEVEL_DEBUG 3
 
-#define U2HTS_LOG_LEVEL U2HTS_LOG_LEVEL_INFO
+#define U2HTS_IRQ_TYPE_FALLING 0
+#define U2HTS_IRQ_TYPE_RISING 1
+#define U2HTS_IRQ_TYPE_LOW 2
+#define U2HTS_IRQ_TYPE_HIGH 3
+
 #if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_ERROR
 #define U2HTS_LOG_ERROR(...) \
   do {                       \
@@ -79,17 +75,18 @@
 
 #define U2HTS_CHECK_BIT(val, bit) ((val) & (1 << (bit)))
 
-#define U2HTS_SWAP16(x) __builtin_bswap16(x)
-
-#define U2HTS_SWAP32(x) __builtin_bswap32(x)
-
 #define U2HTS_MAX_TPS 10
 
-#define U2HTS_LOGICAL_MAX 4096
+#define U2HTS_LOGICAL_MAX 2048
+
+#define U2HTS_UNUSED(x) (void)(x)
+
+#define U2HTS_HID_TP_REPORT_ID 1
+
+#ifdef CFG_TUSB_MCU
 #define U2HTS_PHYSICAL_MAX_X 2048
 #define U2HTS_PHYSICAL_MAX_Y 2048
 
-#define U2HTS_HID_TP_REPORT_ID 1
 #define U2HTS_HID_TP_MAX_COUNT_ID 2
 #define U2HTS_HID_TP_MS_THQA_CERT_ID 3
 
@@ -127,6 +124,7 @@
   HID_USAGE_PAGE_N(0XFF00, 2), HID_USAGE(0xc5), HID_LOGICAL_MAX_N(255, 2), \
       HID_REPORT_COUNT_N(256, 3),                                          \
       HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
+#endif
 
 #define U2HTS_TOUCH_CONTROLLER(controller)                                  \
   __attribute__((                                                           \
@@ -146,6 +144,9 @@ typedef struct __packed {
 } u2hts_tp;
 
 typedef struct __packed {
+#ifndef CFG_TUSB_OS
+  uint8_t report_id;
+#endif
   u2hts_tp tp[U2HTS_MAX_TPS];
   uint16_t scan_time;
   uint8_t tp_count;
@@ -170,7 +171,7 @@ typedef struct {
 } u2hts_config;
 
 typedef struct {
-  void (*setup)();
+  bool (*setup)();
   u2hts_touch_controller_config (*get_config)();
   void (*fetch)(u2hts_config *cfg, u2hts_hid_report *report);
 } u2hts_touch_controller_operations;
@@ -182,46 +183,107 @@ typedef struct {
   u2hts_touch_controller_operations *operations;
 } u2hts_touch_controller;
 
-inline static void u2hts_pins_init() {
-  gpio_set_function(U2HTS_I2C_SCL, GPIO_FUNC_I2C);
-  gpio_set_function(U2HTS_I2C_SDA, GPIO_FUNC_I2C);
-  gpio_pull_up(U2HTS_I2C_SDA);
-  gpio_pull_up(U2HTS_I2C_SCL);
+#ifdef PICO_RP2040
+void u2hts_rp2040_irq_cb(uint gpio, uint32_t event_mask);
+#endif
 
-  i2c_init(U2HTS_I2C, 400 * 1000);  // 400 KHz
-
-  // some touch contoller requires ATTN signal in specified state while
-  // resetting.
-  gpio_set_function(U2HTS_TP_RST, GPIO_FUNC_SIO);
-  gpio_set_dir(U2HTS_TP_RST, GPIO_OUT);
-  gpio_put(U2HTS_TP_INT, 1);
-
-  gpio_set_function(U2HTS_TP_RST, GPIO_FUNC_SIO);
-  gpio_set_dir(U2HTS_TP_RST, GPIO_OUT);
-  gpio_put(U2HTS_TP_RST, 1);
-}
-
-inline static void u2hts_tpint_set(bool value) {
-  gpio_put(U2HTS_TP_INT, value);
-}
-
-// enable interrupt on TPINT pin.
-inline static void u2hts_reset_tpint() {
-  gpio_deinit(U2HTS_TP_INT);
-  gpio_pull_up(U2HTS_TP_INT);
-}
-
-inline static void u2hts_tprst_set(bool value) {
-  gpio_put(U2HTS_TP_RST, value);
-}
-
-inline static void u2hts_delay_ms(uint32_t ms) { sleep_ms(ms); }
-inline static void u2hts_delay_us(uint32_t us) { sleep_us(us); }
 void u2hts_init(u2hts_config *cfg);
 void u2hts_main();
 void u2hts_i2c_write(uint8_t slave_addr, uint32_t reg, size_t reg_size,
                      void *data, size_t data_size);
 void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
                     void *data, size_t data_size);
-void u2hts_irq_cb(uint gpio, uint32_t event_mask);
+void u2hts_tpint_set(bool value);
+void u2hts_irq_setup(u2hts_touch_controller *ctrler);
+bool u2hts_i2c_detect_slave(uint8_t addr);
+void u2hts_tprst_set(bool value);
+void u2hts_delay_ms(uint32_t ms);
+void u2hts_delay_us(uint32_t us);
+void u2hts_irq_set(bool enable);
+void u2hts_irq_status_set(bool status);
+bool u2hts_usb_init();
+uint16_t u2hts_get_scan_time();
+bool u2hts_usb_report(u2hts_hid_report *report, uint8_t report_id);
+
+#ifdef U2HTS_ENABLE_LED
+typedef struct {
+  bool state;
+  uint32_t delay_ms;
+} u2hts_led_pattern;
+
+void u2hts_led_set(bool on);
+
+#define U2HTS_LED_DISPLAY_PATTERN(pattern, count)          \
+  do {                                                     \
+    for (uint32_t i = 0; i < count; i++)                   \
+      u2hts_led_display_pattern(pattern, sizeof(pattern)); \
+  } while (0)
+
+inline static void u2hts_led_display_pattern(u2hts_led_pattern *pattern,
+                                             size_t pattern_len) {
+  for (uint8_t i = 0; i < pattern_len / sizeof(u2hts_led_pattern); i++) {
+    u2hts_led_set(pattern[i].state);
+    u2hts_delay_ms(pattern[i].delay_ms);
+  }
+}
+
+#endif
+
+#ifdef U2HTS_ENABLE_PERSISTENT_CONFIG
+
+#define U2HTS_CONFIG_MAGIC 0xBA
+
+void u2hts_write_config(uint16_t cfg);
+uint16_t u2hts_read_config();
+
+inline static void u2hts_save_config(u2hts_config *cfg) {
+  union {
+    struct {
+      uint8_t magic;
+      uint8_t x_y_swap : 1;
+      uint8_t x_invert : 1;
+      uint8_t y_invert : 1;
+    };
+    uint16_t mask;
+  } u2hts_config_mask;
+  u2hts_config_mask.magic = U2HTS_CONFIG_MAGIC;
+  u2hts_config_mask.x_y_swap = cfg->x_y_swap;
+  u2hts_config_mask.x_invert = cfg->x_invert;
+  u2hts_config_mask.y_invert = cfg->y_invert;
+
+  u2hts_write_config(u2hts_config_mask.mask);
+}
+
+inline static void u2hts_load_config(u2hts_config *cfg) {
+  union {
+    struct {
+      uint8_t magic;
+      uint8_t x_y_swap : 1;
+      uint8_t x_invert : 1;
+      uint8_t y_invert : 1;
+    };
+    uint16_t mask;
+  } u2hts_config_mask;
+  u2hts_config_mask.mask = u2hts_read_config();
+  cfg->x_y_swap = u2hts_config_mask.x_y_swap;
+  cfg->x_invert = u2hts_config_mask.x_invert;
+  cfg->y_invert = u2hts_config_mask.y_invert;
+}
+
+inline static bool u2hts_config_exists() {
+  union {
+    struct {
+      uint8_t magic;
+      uint8_t x_y_swap : 1;
+      uint8_t x_invert : 1;
+      uint8_t y_invert : 1;
+    };
+    uint16_t mask;
+  } u2hts_config_mask;
+  u2hts_config_mask.mask = u2hts_read_config();
+  return (u2hts_config_mask.magic == U2HTS_CONFIG_MAGIC);
+}
+
+#endif
+
 #endif

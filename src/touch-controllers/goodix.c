@@ -10,7 +10,7 @@
 
 #include "u2hts_core.h"
 
-static void goodix_setup();
+static bool goodix_setup();
 static void goodix_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report);
 static u2hts_touch_controller_config goodix_get_config();
 
@@ -19,9 +19,9 @@ static u2hts_touch_controller_operations goodix_ops = {
     .fetch = &goodix_coord_fetch,
     .get_config = &goodix_get_config};
 
-static u2hts_touch_controller goodix = {.name = "Goodix",
+static u2hts_touch_controller goodix = {.name = (uint8_t *)"Goodix",
                                         .i2c_addr = 0x5d,
-                                        .irq_flag = GPIO_IRQ_EDGE_FALL,
+                                        .irq_flag = U2HTS_IRQ_TYPE_FALLING,
                                         .operations = &goodix_ops};
 
 U2HTS_TOUCH_CONTROLLER(goodix);
@@ -133,12 +133,14 @@ static void goodix_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report) {
   }
 }
 
-static void goodix_setup() {
+static bool goodix_setup() {
   u2hts_tpint_set(false);
   u2hts_tprst_set(false);
   u2hts_delay_ms(100);
   u2hts_tprst_set(true);
   u2hts_delay_ms(50);
+
+  bool ret = u2hts_i2c_detect_slave(goodix.i2c_addr);
 
   goodix_product_info info = {0x00};
   goodix_i2c_read(GOODIX_PRODUCT_INFO_START_REG, &info, sizeof(info));
@@ -150,4 +152,5 @@ static void goodix_setup() {
       info.mask_ver_major, info.mask_ver_minor);
   goodix_clear_irq();
   u2hts_delay_ms(100);
+  return ret;
 }

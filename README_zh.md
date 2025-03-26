@@ -9,6 +9,7 @@
 | Synaptics（新思）| S7300B | 10 | 支持 |
 
 # 电路
+`u2hts_rp2040.h`: 
 ```c
 #define U2HTS_I2C_SDA 10
 #define U2HTS_I2C_SCL 11
@@ -35,7 +36,7 @@
 | 最大触摸点数 | `max_tps` | 最大为10 |
 | X轴最大值 | `x_max` | 65535 |
 | Y轴最大值 | `y_max` | 65535 |
-| 中断标志 | `irq_flag` | (参考gpio.h定义) |
+| 中断标志 | `irq_flag` | (0/1/2/3, 参考`u2hts_core.h`) |
 | I2C从机地址 | `i2c_addr` | 7位地址 |
 
 示例：
@@ -43,3 +44,6 @@
 picotool config -s x_invert 1 build/U2HTS.uf2
 picotool load -f build/U2HTS.uf2
 ```
+
+# 移植
+- [STM32F070F6](https://github.com/CNflysky/U2HTS_F070F6)

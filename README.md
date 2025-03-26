@@ -10,6 +10,7 @@ USB HID multitouch touchscreen based on RP2040.
 | Synaptics | S7300B | 10 | okay |
 
 # Circuit
+`u2hts_rp2040.h`: 
 ```c
 #define U2HTS_I2C_SDA 10
 #define U2HTS_I2C_SCL 11
@@ -45,3 +46,6 @@ Example：
 picotool config -s x_invert 1 build/U2HTS.uf2
 picotool load -f build/U2HTS.uf2
 ```
+
+# Ports
+- [STM32F070F6](https://github.com/CNflysky/U2HTS_F070F6)
