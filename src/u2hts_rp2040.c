@@ -58,15 +58,15 @@ void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
     U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d", __func__, reg, ret);
 }
 
-inline void u2hts_irq_set(bool enable) {
+inline void u2hts_ts_irq_set(bool enable) {
   gpio_set_irq_enabled(U2HTS_TP_INT, irq_flag, enable);
 }
 
 inline void u2hts_rp2040_irq_cb(uint gpio, uint32_t event_mask) {
-  u2hts_irq_status_set(gpio == U2HTS_TP_INT && (event_mask & irq_flag));
+  u2hts_ts_irq_status_set(gpio == U2HTS_TP_INT && (event_mask & irq_flag));
 }
 
-inline void u2hts_irq_setup(u2hts_touch_controller *ctrler) {
+inline void u2hts_ts_irq_setup(u2hts_touch_controller *ctrler) {
   gpio_deinit(U2HTS_TP_INT);
   gpio_pull_up(U2HTS_TP_INT);
   switch (ctrler->irq_flag) {

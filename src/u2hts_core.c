@@ -14,6 +14,10 @@ extern u2hts_touch_controller *__u2hts_touch_controllers_end;
 static u2hts_touch_controller *touch_controller = NULL;
 static u2hts_config *config = NULL;
 
+#ifdef U2HTS_ENABLE_BUTTON
+static uint16_t u2hts_config_masks[] = {0x0, 0x620, 0x320, 0x520};
+#endif
+
 #ifdef U2HTS_ENABLE_LED
 static u2hts_led_pattern long_flash[] = {{.state = true, .delay_ms = 1000},
                                          {.state = false, .delay_ms = 1000}};
@@ -24,6 +28,11 @@ static u2hts_led_pattern short_flash[] = {{.state = true, .delay_ms = 250},
 static u2hts_led_pattern ultrashort_flash[] = {
     {.state = true, .delay_ms = 125}, {.state = false, .delay_ms = 125}};
 
+// default
+// x_invert, y_invert
+// x_y_swap, x_invert
+// x_y_swap, y_invert
+
 void u2hts_led_set(bool on);
 #endif
 
@@ -33,12 +42,16 @@ void u2hts_led_set(bool on);
 //     uint8_t interrupt_status : 1;
 //     uint8_t has_remaining_data : 1;
 //     uint8_t transfer_complete : 1;
+//     uint8_t config_mode : 1;
 //   };
 //   uint8_t mask;
 // };
 static uint8_t u2hts_status_mask = 0x00;
 #else
-static bool u2hts_irq_status = false;
+static bool u2hts_ts_irq_status = false;
+#ifdef U2HTS_ENABLE_BUTTON
+static bool u2hts_config_mode = false;
+#endif
 #endif
 
 static u2hts_hid_report u2hts_report = {0x00};
@@ -236,15 +249,68 @@ inline void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
 
 #endif
 
-inline void u2hts_irq_status_set(bool status) {
-  u2hts_irq_set(false);
-  U2HTS_LOG_DEBUG("irq triggered");
+inline void u2hts_ts_irq_status_set(bool status) {
+  u2hts_ts_irq_set(false);
+  U2HTS_LOG_DEBUG("ts irq triggered");
 #ifdef CFG_TUSB_MCU
   U2HTS_SET_BIT(u2hts_status_mask, 0, status);
 #else
-  u2hts_irq_status = status;
+  u2hts_ts_irq_status = status;
 #endif
 }
+
+#ifdef U2HTS_ENABLE_BUTTON
+
+inline static bool u2hts_get_button_timeout(uint32_t ms) {
+  if (u2hts_read_button()) {
+    u2hts_delay_ms(ms);
+    return u2hts_read_button();
+  } else
+    return false;
+}
+
+inline static void u2hts_handle_config() {
+  U2HTS_LOG_INFO("Enter config mode");
+#ifdef U2HTS_ENABLE_LED
+  u2hts_led_set(true);
+#endif
+  u2hts_delay_ms(500);
+
+  uint32_t u2hts_config_timeout = 0;
+  uint8_t config_index = 0;
+  do {
+#ifdef U2HTS_ENABLE_LED
+    u2hts_led_set(true);
+#endif
+    if (u2hts_get_button_timeout(20)) {
+      u2hts_config_timeout = 0;
+      config_index =
+          (config_index < sizeof(u2hts_config_masks) / sizeof(uint16_t) - 1)
+              ? config_index + 1
+              : 0;
+      U2HTS_LOG_INFO("switching config %d", config_index);
+#ifdef U2HTS_ENABLE_LED
+      U2HTS_LED_DISPLAY_PATTERN(ultrashort_flash, config_index + 1);
+#endif
+    } else {
+      u2hts_delay_ms(1);
+      u2hts_config_timeout++;
+    }
+  } while (u2hts_config_timeout < U2HTS_CONFIG_TIMEOUT);
+  U2HTS_LOG_INFO("Exit config mode");
+  u2hts_apply_config(config, u2hts_config_masks[config_index]);
+#ifdef U2HTS_ENABLE_PERSISTENT_CONFIG
+  U2HTS_LOG_INFO("Saving config");
+  u2hts_save_config(config);
+#endif
+#ifdef CFG_TUSB_MCU
+  U2HTS_SET_BIT(u2hts_status_mask, 3, 0);
+#else
+  u2hts_config_mode = false;
+#endif
+}
+
+#endif
 
 inline static u2hts_touch_controller *u2hts_get_touch_controller(
     const uint8_t *name) {
@@ -321,7 +387,7 @@ inline void u2hts_init(u2hts_config *cfg) {
       config->x_max, config->y_max, config->max_tps, config->x_y_swap,
       config->x_invert, config->y_invert);
   u2hts_usb_init();
-  u2hts_irq_setup(touch_controller);
+  u2hts_ts_irq_setup(touch_controller);
 
   U2HTS_LOG_DEBUG("Exit %s", __func__);
 }
@@ -338,7 +404,7 @@ static inline void u2hts_handle_touch() {
 #ifdef CFG_TUSB_MCU
   U2HTS_SET_BIT(u2hts_status_mask, 0, 0);
 #else
-  u2hts_irq_status = false;
+  u2hts_ts_irq_status = false;
 #endif
   if (tp_count == 0 && u2hts_previous_report.tp_count == 0) return;
 
@@ -352,7 +418,7 @@ static inline void u2hts_handle_touch() {
     uint16_t new_ids_mask = 0;
     for (uint8_t i = 0; i < tp_count; i++) {
       uint8_t id = u2hts_report.tp[i].id;
-      if (id < U2HTS_MAX_TPS) U2HTS_SET_BIT(new_ids_mask, id, 1);
+      U2HTS_SET_BIT(new_ids_mask, id, (u2hts_report.tp[i].id < U2HTS_MAX_TPS));
     }
 
     uint16_t released_ids_mask = u2hts_tp_ids_mask & ~new_ids_mask;
@@ -394,20 +460,47 @@ static inline void u2hts_handle_touch() {
 }
 
 inline void u2hts_main() {
-  u2hts_irq_set(true);
-
 #ifdef CFG_TUSB_MCU
   tud_task();
-#ifdef U2HTS_ENABLE_LED
-  u2hts_led_set(U2HTS_CHECK_BIT(u2hts_status_mask, 0));
 #endif
-  if ((u2hts_status_mask & 0x05) == 0x05)
-#else
 
+#ifdef U2HTS_ENABLE_BUTTON
+#ifdef CFG_TUSB_MCU
+  if (U2HTS_CHECK_BIT(u2hts_status_mask, 3))
+#else
+  if (u2hts_config_mode)
+#endif
+    u2hts_handle_config();
+  else {
+    if (u2hts_read_button())
+#ifdef CFG_TUSB_MCU
+      U2HTS_SET_BIT(u2hts_status_mask, 3, u2hts_get_button_timeout(1000));
+#else
+      u2hts_config_mode = u2hts_get_button_timeout(1000);
+#endif
+    else {
+#endif
+      u2hts_ts_irq_set(true);
 #ifdef U2HTS_ENABLE_LED
-  u2hts_led_set(u2hts_irq_status);
+      u2hts_led_set(
+#ifdef CFG_TUSB_MCU
+          U2HTS_CHECK_BIT(u2hts_status_mask, 0)
+#else
+          u2hts_ts_irq_status
 #endif
-  if (u2hts_irq_status)
+      );
 #endif
-    u2hts_handle_touch();
+
+      if (
+#ifdef CFG_TUSB_MCU
+          (u2hts_status_mask & 0x05) == 0x05
+#else
+      u2hts_ts_irq_status
+#endif
+      )
+        u2hts_handle_touch();
+#ifdef U2HTS_ENABLE_BUTTON
+    }
+  }
+#endif
 }

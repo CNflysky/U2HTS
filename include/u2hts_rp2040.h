@@ -15,7 +15,10 @@
 #include "tusb_config.h"
 
 #define U2HTS_ENABLE_LED
-#define U2HTS_ENABLE_PERSISTENT_CONFIG
+// #define U2HTS_ENABLE_PERSISTENT_CONFIG
+#define U2HTS_ENABLE_BUTTON
+
+#define U2HTS_CONFIG_TIMEOUT 5 * 1000  // 5 s
 
 #define U2HTS_LOG_LEVEL U2HTS_LOG_LEVEL_INFO
 
@@ -31,6 +34,8 @@
 #define U2HTS_TP_INT 6
 #define U2HTS_TP_RST 5
 
+#define U2HTS_USR_KEY 9
+
 inline static void u2hts_pins_init() {
   gpio_set_function(U2HTS_I2C_SCL, GPIO_FUNC_I2C);
   gpio_set_function(U2HTS_I2C_SDA, GPIO_FUNC_I2C);
@@ -43,14 +48,17 @@ inline static void u2hts_pins_init() {
   // resetting.
   gpio_set_function(U2HTS_TP_RST, GPIO_FUNC_SIO);
   gpio_set_dir(U2HTS_TP_RST, GPIO_OUT);
-  gpio_put(U2HTS_TP_INT, 1);
+  gpio_put(U2HTS_TP_INT, true);
 
   gpio_set_function(U2HTS_TP_RST, GPIO_FUNC_SIO);
   gpio_set_dir(U2HTS_TP_RST, GPIO_OUT);
-  gpio_put(U2HTS_TP_RST, 1);
+  gpio_put(U2HTS_TP_RST, true);
 
   gpio_set_function(PICO_DEFAULT_LED_PIN, GPIO_FUNC_SIO);
   gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+
+  gpio_init(U2HTS_USR_KEY);
+  gpio_set_dir(U2HTS_USR_KEY, GPIO_IN);
 }
 
 inline static void u2hts_tpint_set(bool value) {
@@ -80,7 +88,9 @@ inline static void u2hts_led_set(bool on) {
   gpio_put(PICO_DEFAULT_LED_PIN, on);
 }
 
+// not implemented yet
 inline static void u2hts_write_config(uint16_t cfg) { (void)cfg; }
 inline static uint16_t u2hts_read_config() { return 0; }
 
+inline static bool u2hts_read_button() { return gpio_get(U2HTS_USR_KEY); }
 #endif
