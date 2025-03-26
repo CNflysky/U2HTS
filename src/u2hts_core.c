@@ -338,7 +338,7 @@ static inline void u2hts_handle_touch() {
 #ifdef CFG_TUSB_MCU
   U2HTS_SET_BIT(u2hts_status_mask, 0, 0);
 #else
-  u2hts_irq_status = true;
+  u2hts_irq_status = false;
 #endif
   if (tp_count == 0 && u2hts_previous_report.tp_count == 0) return;
 
