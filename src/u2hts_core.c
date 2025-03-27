@@ -15,6 +15,10 @@ static u2hts_touch_controller *touch_controller = NULL;
 static u2hts_config *config = NULL;
 
 #ifdef U2HTS_ENABLE_BUTTON
+// default
+// x_invert, y_invert
+// x_y_swap, x_invert
+// x_y_swap, y_invert
 static uint16_t u2hts_config_masks[] = {0x0, 0x620, 0x320, 0x520};
 #endif
 
@@ -27,11 +31,6 @@ static u2hts_led_pattern short_flash[] = {{.state = true, .delay_ms = 250},
 
 static u2hts_led_pattern ultrashort_flash[] = {
     {.state = true, .delay_ms = 125}, {.state = false, .delay_ms = 125}};
-
-// default
-// x_invert, y_invert
-// x_y_swap, x_invert
-// x_y_swap, y_invert
 
 void u2hts_led_set(bool on);
 #endif

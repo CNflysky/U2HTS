@@ -17,18 +17,13 @@ USB HID multitouch touchscreen based on RP2040.
 | Goodix | GT5688 | 10 | okay |
 | Synaptics | S7300B | 10 | okay |
 
-# Circuit
-`u2hts_rp2040.h`: 
-```c
-#define U2HTS_I2C_SDA 10
-#define U2HTS_I2C_SCL 11
-#define U2HTS_TP_INT 6
-#define U2HTS_TP_RST 5
-```
-No external pull-up/pull-down resistors required.  
-
-# Build
-Install `VS code` and `Raspberry Pi Pico` plugin, import this repository, then build.
+# Configs
+| Config | Invert X axis | Invert Y axis | Swap X Y axes |
+| --- | --- | --- | --- |
+| 1 | N | N | N |
+| 2 | Y | Y | N |
+| 3 | Y | N | Y |
+| 4 | N | Y | Y |
 
 # LED pattern decode
 **long flash**: interval 1s  
@@ -55,6 +50,19 @@ System will save config if no operation performed in a specified delay.
 | --- | --- | --- | --- |
 | RP2040 | Y | N | Y |
 | [STM32F070F6](https://github.com/CNflysky/U2HTS_F070F6) | Y | Y | Y |
+
+# RP Circuit
+`u2hts_rp2040.h`: 
+```c
+#define U2HTS_I2C_SDA 10
+#define U2HTS_I2C_SCL 11
+#define U2HTS_TP_INT 6
+#define U2HTS_TP_RST 5
+```
+No external pull-up/pull-down resistors required.  
+
+# RP Build
+Install `VS code` and `Raspberry Pi Pico` plugin, import this repository, then build.
 
 # RP Config
 You can config touchscreen via `picotool` without recompiling the binary on RP series platforms.

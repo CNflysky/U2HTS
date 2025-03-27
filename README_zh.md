@@ -16,18 +16,14 @@
 | Goodix（汇顶）| GT5688 | 10 | 支持 |
 | Synaptics（新思）| S7300B | 10 | 支持 |
 
-# 电路
-`u2hts_rp2040.h`: 
-```c
-#define U2HTS_I2C_SDA 10
-#define U2HTS_I2C_SCL 11
-#define U2HTS_TP_INT 6
-#define U2HTS_TP_RST 5
-```
-所有I/O端口直接连接即可，无需任何上/下拉电阻。  
-
-# 构建
-安装`VS code`和`Raspberry Pi Pico`插件, 导入项目后构建即可。
+# 配置
+内置4个配置：
+| 配置 | X轴反转 | Y轴反转 | XY轴交换 |
+| --- | --- | --- | --- |
+| 1 | N | N | N |
+| 2 | Y | Y | N |
+| 3 | Y | N | Y |
+| 4 | N | Y | Y |
 
 # LED闪烁含义
 **长闪：1s的闪烁**  
@@ -44,7 +40,7 @@
 
 # 按键
 *进入配置模式*: 长按1秒  
-*切换配置*: 短按
+*切换配置*: 短按  
 在指定的时间内无操作后会自动退出配置模式（保存配置）。
 
 # 移植
@@ -52,6 +48,19 @@
 | --- | --- | --- | --- |
 | RP2040 | Y | N | Y |
 | [STM32F070F6](https://github.com/CNflysky/U2HTS_F070F6) | Y | Y | Y |
+
+# RP系列电路
+`u2hts_rp2040.h`: 
+```c
+#define U2HTS_I2C_SDA 10
+#define U2HTS_I2C_SCL 11
+#define U2HTS_TP_INT 6
+#define U2HTS_TP_RST 5
+```
+所有I/O端口直接连接即可，无需任何上/下拉电阻。  
+
+# RP系列构建
+安装`VS code`和`Raspberry Pi Pico`插件, 导入项目后构建即可。
 
 # RP系列配置
 RP系列支持通过`Picotool`工具来修改触摸屏相关设置，不需要重新编译。  
