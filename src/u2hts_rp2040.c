@@ -58,6 +58,7 @@ void u2hts_i2c_read(uint8_t slave_addr, uint32_t reg, size_t reg_size,
     U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d", __func__, reg, ret);
 }
 
+#ifndef U2HTS_POLLING
 inline void u2hts_ts_irq_set(bool enable) {
   gpio_set_irq_enabled(U2HTS_TP_INT, irq_flag, enable);
 }
@@ -88,6 +89,7 @@ inline void u2hts_ts_irq_setup(u2hts_touch_controller *ctrler) {
                                      u2hts_rp2040_irq_cb);
 }
 
+#endif
 inline bool u2hts_usb_report(u2hts_hid_report *report, uint8_t report_id) {
   return tud_hid_report(report_id, report, CFG_TUD_HID_EP_BUFSIZE - 1);
 }

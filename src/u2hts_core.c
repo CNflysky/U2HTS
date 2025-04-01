@@ -47,7 +47,9 @@ void u2hts_led_set(bool on);
 // };
 static uint8_t u2hts_status_mask = 0x00;
 #else
+#ifndef U2HTS_POLLING
 static bool u2hts_ts_irq_status = false;
+#endif
 #ifdef U2HTS_ENABLE_BUTTON
 static bool u2hts_config_mode = false;
 #endif
@@ -246,8 +248,11 @@ inline void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
                 (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE));
 }
 
+#else
+inline uint8_t u2hts_get_max_tps() { return config->max_tps; }
 #endif
 
+#ifndef U2HTS_POLLING
 inline void u2hts_ts_irq_status_set(bool status) {
   u2hts_ts_irq_set(false);
   U2HTS_LOG_DEBUG("ts irq triggered");
@@ -257,6 +262,7 @@ inline void u2hts_ts_irq_status_set(bool status) {
   u2hts_ts_irq_status = status;
 #endif
 }
+#endif
 
 #ifdef U2HTS_ENABLE_BUTTON
 
@@ -343,8 +349,21 @@ inline void u2hts_init(u2hts_config *cfg) {
   else
     U2HTS_LED_DISPLAY_PATTERN(ultrashort_flash, 2);
 #endif
-  U2HTS_LOG_INFO("U2HTS for %s, built @ %s %s", touch_controller->name,
-                 __DATE__, __TIME__);
+  U2HTS_LOG_INFO("U2HTS for %s, built @ %s %s with feature%s",
+                 touch_controller->name, __DATE__, __TIME__,
+#ifdef U2HTS_POLLING
+                 " U2HTS_POLLING"
+#endif
+#ifdef U2HTS_ENABLE_LED
+                 " U2HTS_ENABLE_LED"
+#endif
+#ifdef U2HTS_ENABLE_BUTTON
+                 " U2HTS_ENABLE_BUTTON"
+#endif
+#ifdef U2HTS_ENABLE_PERSISTENT_CONFIG
+                 " U2HTS_ENABLE_PERSISTENT_CONFIG"
+#endif
+  );
 
   touch_controller->i2c_addr =
       (config->i2c_addr) ? config->i2c_addr : touch_controller->i2c_addr;
@@ -370,12 +389,6 @@ inline void u2hts_init(u2hts_config *cfg) {
       "%d",
       tc_config.max_tps, tc_config.x_max, tc_config.y_max);
 
-  if (tc_config.x_max < tc_config.y_max)
-    U2HTS_LOG_WARN(
-        "y_max is bigger than x_max, that means touchscreen was "
-        "configured as vertical. You may want to configure x_y_swap and "
-        "x_invert to true on horizontal applications.");
-
   config->x_max = (config->x_max) ? config->x_max : tc_config.x_max;
   config->y_max = (config->y_max) ? config->y_max : tc_config.y_max;
   config->max_tps = (config->max_tps) ? config->max_tps : tc_config.max_tps;
@@ -386,7 +399,9 @@ inline void u2hts_init(u2hts_config *cfg) {
       config->x_max, config->y_max, config->max_tps, config->x_y_swap,
       config->x_invert, config->y_invert);
   u2hts_usb_init();
+#ifndef U2HTS_POLLING
   u2hts_ts_irq_setup(touch_controller);
+#endif
 
   U2HTS_LOG_DEBUG("Exit %s", __func__);
 }
@@ -400,12 +415,18 @@ static inline void u2hts_handle_touch() {
 
   uint8_t tp_count = u2hts_report.tp_count;
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
+#ifndef U2HTS_POLLING
 #ifdef CFG_TUSB_MCU
   U2HTS_SET_BIT(u2hts_status_mask, 0, 0);
 #else
   u2hts_ts_irq_status = false;
 #endif
+#endif
   if (tp_count == 0 && u2hts_previous_report.tp_count == 0) return;
+
+#if defined(U2HTS_POLLING) && defined(U2HTS_ENABLE_LED)
+  u2hts_led_set(true);
+#endif
 
 #ifdef CFG_TUSB_MCU
   U2HTS_SET_BIT(u2hts_status_mask, 2, 0);
@@ -437,7 +458,7 @@ static inline void u2hts_handle_touch() {
     u2hts_report.tp_count = tp_count;
   }
 
-  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) {
+  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++)
     U2HTS_LOG_DEBUG(
         "report.tp[%d].contact = %d, report.tp[i].x = %d, "
         "report.tp[i].y = %d, report.tp[i].height = %d, "
@@ -445,7 +466,7 @@ static inline void u2hts_handle_touch() {
         i, u2hts_report.tp[i].contact, u2hts_report.tp[i].x,
         u2hts_report.tp[i].y, u2hts_report.tp[i].height,
         u2hts_report.tp[i].width, u2hts_report.tp[i].id);
-  }
+
   U2HTS_LOG_DEBUG("report.scan_time = %d, report.tp_count = %d",
                   u2hts_report.scan_time, u2hts_report.tp_count);
 #ifdef CFG_TUSB_MCU
@@ -479,24 +500,37 @@ inline void u2hts_main() {
 #endif
     else {
 #endif
+#ifndef U2HTS_POLLING
       u2hts_ts_irq_set(true);
+#endif
+
 #ifdef U2HTS_ENABLE_LED
       u2hts_led_set(
 #ifdef CFG_TUSB_MCU
           U2HTS_CHECK_BIT(u2hts_status_mask, 0)
 #else
+#ifndef U2HTS_POLLING
           u2hts_ts_irq_status
+#else
+          false
+#endif
 #endif
       );
 #endif
 
+#ifndef U2HTS_POLLING
       if (
 #ifdef CFG_TUSB_MCU
           (u2hts_status_mask & 0x05) == 0x05
 #else
-      u2hts_ts_irq_status
+          u2hts_ts_irq_status
 #endif
       )
+#else
+#ifdef CFG_TUSB_MCU
+  if (U2HTS_CHECK_BIT(u2hts_status_mask, 2))
+#endif
+#endif
         u2hts_handle_touch();
 #ifdef U2HTS_ENABLE_BUTTON
     }
