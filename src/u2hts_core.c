@@ -35,7 +35,6 @@ static u2hts_led_pattern ultrashort_flash[] = {
 void u2hts_led_set(bool on);
 #endif
 
-#ifdef CFG_TUSB_MCU
 // union u2hts_status_mask {
 //   struct {
 //     uint8_t interrupt_status : 1;
@@ -46,10 +45,7 @@ void u2hts_led_set(bool on);
 //   uint8_t mask;
 // };
 static uint8_t u2hts_status_mask = 0x00;
-#else
 #ifndef U2HTS_POLLING
-static bool u2hts_ts_irq_status = false;
-#endif
 #ifdef U2HTS_ENABLE_BUTTON
 static bool u2hts_config_mode = false;
 #endif
@@ -225,11 +221,7 @@ inline uint8_t u2hts_get_max_tps() { return config->max_tps; }
 inline void u2hts_ts_irq_status_set(bool status) {
   u2hts_ts_irq_set(false);
   U2HTS_LOG_DEBUG("ts irq triggered");
-#ifdef CFG_TUSB_MCU
   U2HTS_SET_BIT(u2hts_status_mask, 0, status);
-#else
-  u2hts_ts_irq_status = status;
-#endif
 }
 #endif
 
@@ -277,11 +269,7 @@ inline static void u2hts_handle_config() {
   U2HTS_LOG_INFO("Saving config");
   u2hts_save_config(config);
 #endif
-#ifdef CFG_TUSB_MCU
   U2HTS_SET_BIT(u2hts_status_mask, 3, 0);
-#else
-  u2hts_config_mode = false;
-#endif
 }
 
 #endif
@@ -319,7 +307,7 @@ inline void u2hts_init(u2hts_config *cfg) {
     U2HTS_LED_DISPLAY_PATTERN(ultrashort_flash, 2);
 #endif
   U2HTS_LOG_INFO("U2HTS for %s, built @ %s %s with feature%s",
-                 touch_controller->name, __DATE__, __TIME__,
+                 touch_controller->name, __DATE__, __TIME__, ""
 #ifdef U2HTS_POLLING
                  " U2HTS_POLLING"
 #endif
@@ -385,11 +373,7 @@ static inline void u2hts_handle_touch() {
   uint8_t tp_count = u2hts_report.tp_count;
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
 #ifndef U2HTS_POLLING
-#ifdef CFG_TUSB_MCU
   U2HTS_SET_BIT(u2hts_status_mask, 0, 0);
-#else
-  u2hts_ts_irq_status = false;
-#endif
 #endif
   if (tp_count == 0 && u2hts_previous_report.tp_count == 0) return;
 
@@ -454,47 +438,34 @@ inline void u2hts_main() {
 #endif
 
 #ifdef U2HTS_ENABLE_BUTTON
-#ifdef CFG_TUSB_MCU
   if (U2HTS_CHECK_BIT(u2hts_status_mask, 3))
-#else
-  if (u2hts_config_mode)
-#endif
     u2hts_handle_config();
   else {
     if (u2hts_read_button())
-#ifdef CFG_TUSB_MCU
       U2HTS_SET_BIT(u2hts_status_mask, 3, u2hts_get_button_timeout(1000));
-#else
-      u2hts_config_mode = u2hts_get_button_timeout(1000);
-#endif
     else {
 #endif
+
 #ifndef U2HTS_POLLING
       u2hts_ts_irq_set(true);
 #endif
 
 #ifdef U2HTS_ENABLE_LED
       u2hts_led_set(
-#ifdef CFG_TUSB_MCU
-          U2HTS_CHECK_BIT(u2hts_status_mask, 0)
-#else
-#ifndef U2HTS_POLLING
-          u2hts_ts_irq_status
-#else
+#ifdef U2HTS_POLLING
           false
-#endif
+#else
+          U2HTS_CHECK_BIT(u2hts_status_mask, 0)
 #endif
       );
 #endif
 
-#ifndef U2HTS_POLLING
-      if (
-#ifdef CFG_TUSB_MCU
-          (u2hts_status_mask & 0x05) == 0x05
-#else
-          u2hts_ts_irq_status
+#ifndef CFG_TUSB_MCU
+      U2HTS_SET_BIT(u2hts_status_mask, 2, u2hts_get_usb_status());
 #endif
-      )
+
+#ifndef U2HTS_POLLING
+      if ((u2hts_status_mask & 0x05) == 0x05)
 #else
 #ifdef CFG_TUSB_MCU
   if (U2HTS_CHECK_BIT(u2hts_status_mask, 2))
