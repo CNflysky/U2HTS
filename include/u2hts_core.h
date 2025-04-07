@@ -120,10 +120,6 @@
 #define U2HTS_HID_TP_MAX_COUNT_DESC \
   HID_USAGE(0x55), HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
 
-#define U2HTS_HID_TP_MS_THQA_CERT_DESC                                     \
-  HID_USAGE_PAGE_N(0XFF00, 2), HID_USAGE(0xc5), HID_LOGICAL_MAX_N(255, 2), \
-      HID_REPORT_COUNT_N(256, 3),                                          \
-      HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
 #else
 uint8_t u2hts_get_max_tps();
 #endif
