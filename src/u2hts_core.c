@@ -351,7 +351,7 @@ inline void u2hts_init(u2hts_config *cfg) {
   config->max_tps = (config->max_tps) ? config->max_tps : tc_config.max_tps;
 
   U2HTS_LOG_INFO(
-      "U2HTS config: x_max = %d, y_max=%d, max_tps = %d, x_y_swap = %d, "
+      "U2HTS config: x_max = %d, y_max = %d, max_tps = %d, x_y_swap = %d, "
       "x_invert = %d, y_invert = %d",
       config->x_max, config->y_max, config->max_tps, config->x_y_swap,
       config->x_invert, config->y_invert);

@@ -12,10 +12,12 @@ USB HID multitouch touchscreen based on RP2040.
 - Support persistent config
 
 # Touch controllers
-| Vendor | Part Num | Max TPs | Auto configuration |
-| --- | --- | --- | --- |
-| Goodix | GT5688 | 10 | okay |
-| Synaptics | S7300B | 10 | okay |
+| Vendor | Series | Max TPs | Auto configuration | Note | Code |
+| --- | --- | --- | --- | --- |
+| Goodix | GT9xx | 10 | okay | Tested on GT5688 | `Goodix` |
+| Synaptics | RMI4-F11-I2C | 10 | okay | Tested on S7300B | `rmi_i2c` |
+| Focaltech | FT3x68 | 2 | NO | Experimental support | `ft3168` |
+| Hynitron | CST8xx | 1 | NO | Experimental support | `cst816d` |
 
 # Configs
 | Config | Invert X axis | Invert Y axis | Swap X Y axes |
