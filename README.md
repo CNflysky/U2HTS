@@ -13,7 +13,7 @@ USB HID multitouch touchscreen based on RP2040.
 
 # Touch controllers
 | Vendor | Series | Max TPs | Auto configuration | Note | Code |
-| --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- |
 | Goodix | GT9xx | 10 | okay | Tested on GT5688 | `Goodix` |
 | Synaptics | RMI4-F11-I2C | 10 | okay | Tested on S7300B | `rmi_i2c` |
 | Focaltech | FT3x68 | 2 | NO | Experimental support | `ft3168` |
