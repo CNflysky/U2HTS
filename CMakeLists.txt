@@ -23,7 +23,6 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-set(PICO_BOARD pico CACHE STRING "Board type")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
@@ -36,6 +35,7 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 file(GLOB_RECURSE SOURCES "src/*.c")
+list(REMOVE_ITEM SOURCES ${CMAKE_CURRENT_LIST_DIR}/src/touch-controllers/controller_template.c)
 set(SOURCES ${SOURCES} u2hts_main.c)
 
 add_executable(U2HTS ${SOURCES})

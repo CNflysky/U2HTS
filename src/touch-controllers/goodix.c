@@ -30,7 +30,6 @@ U2HTS_TOUCH_CONTROLLER(goodix);
 #define GOODIX_PRODUCT_INFO_START_REG 0x8140
 #define GOODIX_TP_COUNT_REG 0x814E
 #define GOODIX_TP_DATA_START_REG 0x814F
-#define GOODIX_CONFIG_REPORT_RATE_REG 0x805E
 
 typedef struct __packed {
   uint8_t track_id;
@@ -98,8 +97,8 @@ static inline void goodix_clear_irq() {
 static void goodix_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report) {
   uint8_t tp_count = goodix_read_byte(GOODIX_TP_COUNT_REG) & 0xF;
   goodix_clear_irq();
-  report->tp_count = tp_count;
   if (tp_count == 0) return;
+  report->tp_count = tp_count;
   goodix_tp_data tp_data[tp_count];
   goodix_i2c_read(GOODIX_TP_DATA_START_REG, tp_data, sizeof(tp_data));
   for (uint8_t i = 0; i < tp_count; i++) {

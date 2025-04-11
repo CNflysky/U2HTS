@@ -307,7 +307,8 @@ inline void u2hts_init(u2hts_config *cfg) {
     U2HTS_LED_DISPLAY_PATTERN(ultrashort_flash, 2);
 #endif
   U2HTS_LOG_INFO("U2HTS for %s, built @ %s %s with feature%s",
-                 touch_controller->name, __DATE__, __TIME__, ""
+                 touch_controller->name, __DATE__, __TIME__,
+                 ""
 #ifdef U2HTS_POLLING
                  " U2HTS_POLLING"
 #endif
