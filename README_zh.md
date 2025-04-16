@@ -11,12 +11,12 @@
 - 支持持久化保存配置
 
 # 触摸控制器
-| 制造商 | 系列 | 最大触摸点数 | 自动配置 | 备注 | 代码 |
+| 制造商 | 系列 | 最大触摸点数 | 自动配置 | 测试 | 代码 |
 | --- | --- | --- | --- | --- | --- |
-| Goodix 汇顶 | GT9xx | 10 | 支持 | 在GT5688上测试通过 | `Goodix` |
-| Synaptics 新思 | RMI4-F11-I2C | 10 | 支持 | 在S7300B上测试通过 | `rmi_i2c` |
-| Focaltech 敦泰 | FT3x68 | 2 | 不支持 | 实验性支持 | `ft3168` |
-| Hynitron 海栎创 | CST8xx | 1 | 不支持 | 实验性支持 | `cst816d` |
+| Goodix 汇顶 | `GT9xx` | 10 | 支持 | GT5688 | `gt9xx` |
+| Synaptics 新思 | `RMI4-F11-I2C` | 10 | 支持 | S7300B | `rmi_f11` |
+| Focaltech 敦泰 | `FT3x68`, `FT54x6` | 2 | 不支持 | ft3168，ft5406 | `ft3x68`, `ft54x6` |
+| Hynitron 海栎创 | `CST8xx` | 1 | 不支持 | cst816d | `cst8xx` |
 
 # 配置
 内置4个配置：

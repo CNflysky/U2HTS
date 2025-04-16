@@ -1,3 +1,10 @@
+/*
+  Copyright (C) CNflysky.
+  U2HTS stands for "USB to HID TouchScreen".
+  This file is licensed under GPL V3.
+  All rights reserved.
+*/
+
 #include "rmi_common.h"
 static uint8_t rmi_current_page = 0x00;
 static rmi_pdt f01 = {0x00};

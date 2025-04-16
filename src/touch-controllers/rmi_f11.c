@@ -67,6 +67,8 @@ static void rmi_f11_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report) {
   rmi_clear_irq(rmi_f11.i2c_addr);
 
   uint8_t tp_count = 0;
+  rmi_f11_max_tps =
+      (rmi_f11_max_tps < cfg->max_tps) ? rmi_f11_max_tps : cfg->max_tps;
   rmi_f11_tp_data f11_data[rmi_f11_max_tps];
   uint8_t fsd_size = (rmi_f11_max_tps + 3) / 4;
   uint32_t fsd = 0x0;  // finger status data

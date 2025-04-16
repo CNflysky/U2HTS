@@ -109,6 +109,7 @@ static inline void mycontroller_coord_fetch(u2hts_config *cfg,
   // 清中断标志
   mycontroller_write_byte(MYCONTROLLER_TP_COUNT_REG, 0x00);
   if (tp_count == 0) return;
+  tp_count = (tp_count < cfg->max_tps) ? tp_count : cfg->max_tps;
   report->tp_count = tp_count;
   // read tp data
   // 读取触摸数据

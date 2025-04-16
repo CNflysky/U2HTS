@@ -34,23 +34,18 @@ static u2hts_led_pattern ultrashort_flash[] = {
 
 void u2hts_led_set(bool on);
 #endif
-
+static uint32_t u2hts_tps_release_timeout = 0;
 // union u2hts_status_mask {
 //   struct {
-//     uint8_t interrupt_status : 1;
-//     uint8_t has_remaining_data : 1;
-//     uint8_t transfer_complete : 1;
-//     uint8_t config_mode : 1;
+//     uint8_t interrupt_status : 1; // 0
+//     uint8_t has_remaining_data : 1; // 1
+//     uint8_t transfer_complete : 1; // 2
+//     uint8_t config_mode : 1; // 3
+//     uint8_t tps_released : 1; // 4
 //   };
 //   uint8_t mask;
 // };
 static uint8_t u2hts_status_mask = 0x00;
-#ifndef U2HTS_POLLING
-#ifdef U2HTS_ENABLE_BUTTON
-static bool u2hts_config_mode = false;
-#endif
-#endif
-
 static u2hts_hid_report u2hts_report = {0x00};
 static u2hts_hid_report u2hts_previous_report = {0x00};
 static uint16_t u2hts_tp_ids_mask = 0;
@@ -366,10 +361,9 @@ inline void u2hts_init(u2hts_config *cfg) {
 
 static inline void u2hts_handle_touch() {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
-  u2hts_touch_controller_operations *ops = touch_controller->operations;
   memset(&u2hts_report, 0x00, sizeof(u2hts_report));
   for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].id = 0xFF;
-  ops->fetch(config, &u2hts_report);
+  touch_controller->operations->fetch(config, &u2hts_report);
 
   uint8_t tp_count = u2hts_report.tp_count;
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
@@ -381,11 +375,7 @@ static inline void u2hts_handle_touch() {
 #if defined(U2HTS_POLLING) && defined(U2HTS_ENABLE_LED)
   u2hts_led_set(true);
 #endif
-
-#ifdef CFG_TUSB_MCU
   U2HTS_SET_BIT(u2hts_status_mask, 2, 0);
-#endif
-
   u2hts_report.scan_time = u2hts_get_scan_time();
 
   if (u2hts_previous_report.tp_count != u2hts_report.tp_count) {
@@ -431,6 +421,8 @@ static inline void u2hts_handle_touch() {
   u2hts_usb_report(&u2hts_report, U2HTS_HID_TP_REPORT_ID);
 #endif
   u2hts_previous_report = u2hts_report;
+  U2HTS_SET_BIT(u2hts_status_mask, 5, !(u2hts_previous_report.tp_count == 0));
+  u2hts_tps_release_timeout = 0;
 }
 
 inline void u2hts_main() {
@@ -446,6 +438,16 @@ inline void u2hts_main() {
       U2HTS_SET_BIT(u2hts_status_mask, 3, u2hts_get_button_timeout(1000));
     else {
 #endif
+      if (U2HTS_CHECK_BIT(u2hts_status_mask, 5)) {
+        // 10 ms
+        if (u2hts_tps_release_timeout > U2HTS_TPS_RELEASE_TIMEOUT &&
+            U2HTS_CHECK_BIT(u2hts_status_mask, 2))
+          u2hts_handle_touch();
+        else {
+          u2hts_delay_us(1);
+          u2hts_tps_release_timeout++;
+        }
+      }
 
 #ifndef U2HTS_POLLING
       u2hts_ts_irq_set(true);
