@@ -116,36 +116,15 @@ static inline void mycontroller_coord_fetch(u2hts_config *cfg,
   mycontroller_tp_data tp[tp_count];
   mycontroller_i2c_read(MYCONTROLLER_TP_DATA_START_REG, &tp, sizeof(tp));
   for (uint8_t i = 0; i < tp_count; i++) {
-    // process tp data
-    // 处理触摸数据
     report->tp[i].id = tp[i].id;
     report->tp[i].contact = true;
-
-    // make sure coordinates does not exceed limit specified in config
-    // 确保坐标不会超出配置中的值
-    tp[i].x = (tp[i].x > cfg->x_max) ? cfg->x_max : tp[i].x;
-    tp[i].y = (tp[i].y > cfg->y_max) ? cfg->y_max : tp[i].y;
-
-    // map coords into HID value range
-    // 将坐标映射到HID描述符中设置的值域
-    report->tp[i].x = U2HTS_MAP_VALUE(tp[i].x, cfg->x_max, U2HTS_LOGICAL_MAX);
-    report->tp[i].y = U2HTS_MAP_VALUE(tp[i].y, cfg->y_max, U2HTS_LOGICAL_MAX);
-
-    // process xy swap
-    // 处理xy交换
-    if (cfg->x_y_swap) {
-      report->tp[i].x ^= report->tp[i].y;
-      report->tp[i].y ^= report->tp[i].x;
-      report->tp[i].x ^= report->tp[i].y;
-    }
-
-    // process xy invert
-    // 处理xy颠倒
-    if (cfg->x_invert) report->tp[i].x = U2HTS_LOGICAL_MAX - report->tp[i].x;
-    if (cfg->y_invert) report->tp[i].y = U2HTS_LOGICAL_MAX - report->tp[i].y;
-
+    report->tp[i].x = tp[i].x;
+    report->tp[i].y = tp[i].y;
     report->tp[i].width = tp[i].width;
     report->tp[i].height = tp[i].height;
+    // process tp data
+    // 处理触摸数据
+    u2hts_apply_config_to_tp(cfg, &report->tp[i]);
   }
   // no need to fill report->scan_time, it will be filled by u2hts_core.c
   // 不需要填写report->scan_time, u2hts_core.c会处理它

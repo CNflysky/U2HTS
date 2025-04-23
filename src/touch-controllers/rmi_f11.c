@@ -81,37 +81,14 @@ static void rmi_f11_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report) {
       tp_count++;
       report->tp[tp_index].contact = true;
       report->tp[tp_index].id = i;
-
-      report->tp[tp_index].x = (report->tp[tp_index].x > cfg->x_max)
-                                   ? cfg->x_max
-                                   : report->tp[tp_index].x;
-      report->tp[tp_index].y = (report->tp[tp_index].y > cfg->y_max)
-                                   ? cfg->y_max
-                                   : report->tp[tp_index].y;
-
       report->tp[tp_index].x =
-          U2HTS_MAP_VALUE((f11_data[i].xy_low & 0xF) | f11_data[i].x_high << 4,
-                          cfg->x_max, U2HTS_LOGICAL_MAX);
-
-      report->tp[tp_index].y = U2HTS_MAP_VALUE(
-          (f11_data[i].xy_low & 0xF0) >> 4 | f11_data[i].y_high << 4,
-          cfg->y_max, U2HTS_LOGICAL_MAX);
-
-      if (cfg->x_y_swap) {
-        report->tp[tp_index].x ^= report->tp[tp_index].y;
-        report->tp[tp_index].y ^= report->tp[tp_index].x;
-        report->tp[tp_index].x ^= report->tp[tp_index].y;
-      }
-
-      if (cfg->x_invert)
-        report->tp[tp_index].x = U2HTS_LOGICAL_MAX - report->tp[tp_index].x;
-
-      if (cfg->y_invert)
-        report->tp[tp_index].y = U2HTS_LOGICAL_MAX - report->tp[tp_index].y;
-
+          (f11_data[i].xy_low & 0xF) | (f11_data[i].x_high << 4);
+      report->tp[tp_index].y =
+          (f11_data[i].xy_low & 0xF0) >> 4 | (f11_data[i].y_high << 4);
       report->tp[tp_index].width = f11_data[i].wxy & 0xF;
       report->tp[tp_index].height = (f11_data[i].wxy & 0xF0) >> 4;
       report->tp[tp_index].pressure = f11_data[i].z;
+      u2hts_apply_config_to_tp(cfg, &report->tp[tp_index]);
       tp_index++;
     }
   }

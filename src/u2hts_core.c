@@ -37,14 +37,26 @@ void u2hts_led_set(bool on);
 static uint32_t u2hts_tps_release_timeout = 0;
 // union u2hts_status_mask {
 //   struct {
-//     uint8_t interrupt_status : 1; // 0
-//     uint8_t has_remaining_data : 1; // 1
-//     uint8_t transfer_complete : 1; // 2
-//     uint8_t config_mode : 1; // 3
-//     uint8_t tps_released : 1; // 4
+//     uint8_t interrupt_status : 1;
+//     uint8_t has_remaining_data : 1;
+//     uint8_t transfer_complete : 1;
+//     uint8_t config_mode : 1;
+//     uint8_t tps_remain : 1;
 //   };
 //   uint8_t mask;
 // };
+#define U2HTS_SET_IRQ_STATUS_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 0, x)
+#define U2HTS_SET_DATA_REMAIN_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 1, x)
+#define U2HTS_SET_TRANSFER_DONE_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 2, x)
+#define U2HTS_SET_CONFIG_MODE_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 3, x)
+#define U2HTS_SET_TPS_REMAIN_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 4, x)
+
+#define U2HTS_GET_IRQ_STATUS_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 0)
+#define U2HTS_GET_DATA_REMAIN_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 1)
+#define U2HTS_GET_TRANSFER_DONE_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 2)
+#define U2HTS_GET_CONFIG_MODE_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 3)
+#define U2HTS_GET_TPS_REMAIN_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 4)
+
 static uint8_t u2hts_status_mask = 0x00;
 static u2hts_hid_report u2hts_report = {0x00};
 static u2hts_hid_report u2hts_previous_report = {0x00};
@@ -191,21 +203,21 @@ inline uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
   switch (report_id) {
     case U2HTS_HID_TP_MAX_COUNT_ID:
       buffer[0] = config->max_tps;
-      U2HTS_SET_BIT(u2hts_status_mask, 2, 1);
+      U2HTS_SET_TRANSFER_DONE_FLAG(1);
       return 1;
   }
 }
 
 inline void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
                                        uint16_t len) {
-  if (U2HTS_CHECK_BIT(u2hts_status_mask, 1)) {
+  if (U2HTS_GET_DATA_REMAIN_FLAG()) {
     tud_hid_report(
         0, (void *)((uint32_t)&u2hts_report + CFG_TUD_HID_EP_BUFSIZE - 1),
         sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE);
-    U2HTS_SET_BIT(u2hts_status_mask, 1, 0);
+    U2HTS_SET_DATA_REMAIN_FLAG(0);
   }
-  U2HTS_SET_BIT(u2hts_status_mask, 2,
-                (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE));
+  U2HTS_SET_TRANSFER_DONE_FLAG(
+      (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE));
 }
 
 #else
@@ -216,7 +228,7 @@ inline uint8_t u2hts_get_max_tps() { return config->max_tps; }
 inline void u2hts_ts_irq_status_set(bool status) {
   u2hts_ts_irq_set(false);
   U2HTS_LOG_DEBUG("ts irq triggered");
-  U2HTS_SET_BIT(u2hts_status_mask, 0, status);
+  U2HTS_SET_IRQ_STATUS_FLAG(status);
 }
 #endif
 
@@ -264,7 +276,7 @@ inline static void u2hts_handle_config() {
   U2HTS_LOG_INFO("Saving config");
   u2hts_save_config(config);
 #endif
-  U2HTS_SET_BIT(u2hts_status_mask, 3, 0);
+  U2HTS_SET_CONFIG_MODE_FLAG(0);
 }
 
 #endif
@@ -275,6 +287,23 @@ inline static u2hts_touch_controller *u2hts_get_touch_controller(
        tc < &__u2hts_touch_controllers_end; tc++)
     if (!strcmp((const char *)(*tc)->name, (const char *)name)) return *tc;
   return NULL;
+}
+
+void u2hts_apply_config_to_tp(u2hts_config *cfg, u2hts_tp *tp) {
+  tp->x = (tp->x > cfg->x_max) ? cfg->x_max : tp->x;
+  tp->y = (tp->y > cfg->y_max) ? cfg->y_max : tp->y;
+  tp->x = U2HTS_MAP_VALUE(tp->x, cfg->x_max, U2HTS_LOGICAL_MAX);
+  tp->y = U2HTS_MAP_VALUE(tp->y, cfg->y_max, U2HTS_LOGICAL_MAX);
+  if (cfg->x_y_swap) {
+    tp->x ^= tp->y;
+    tp->y ^= tp->x;
+    tp->x ^= tp->y;
+  }
+  if (cfg->x_invert) tp->x = U2HTS_LOGICAL_MAX - tp->x;
+  if (cfg->y_invert) tp->y = U2HTS_LOGICAL_MAX - tp->y;
+  tp->width = (tp->width) ? tp->width : U2HTS_DEFAULT_TP_WIDTH;
+  tp->height = (tp->height) ? tp->height : U2HTS_DEFAULT_TP_HEIGHT;
+  tp->pressure = (tp->pressure) ? tp->pressure : U2HTS_DEFAULT_TP_PRESSURE;
 }
 
 inline void u2hts_init(u2hts_config *cfg) {
@@ -368,14 +397,14 @@ static inline void u2hts_handle_touch() {
   uint8_t tp_count = u2hts_report.tp_count;
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
 #ifndef U2HTS_POLLING
-  U2HTS_SET_BIT(u2hts_status_mask, 0, 0);
+  U2HTS_SET_IRQ_STATUS_FLAG(0);
 #endif
   if (tp_count == 0 && u2hts_previous_report.tp_count == 0) return;
 
 #if defined(U2HTS_POLLING) && defined(U2HTS_ENABLE_LED)
   u2hts_led_set(true);
 #endif
-  U2HTS_SET_BIT(u2hts_status_mask, 2, 0);
+  U2HTS_SET_TRANSFER_DONE_FLAG(0);
   u2hts_report.scan_time = u2hts_get_scan_time();
 
   if (u2hts_previous_report.tp_count != u2hts_report.tp_count) {
@@ -402,7 +431,7 @@ static inline void u2hts_handle_touch() {
     u2hts_report.tp_count = tp_count;
   }
 
-  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++)
+  for (uint8_t i = 0; i < tp_count; i++)
     U2HTS_LOG_DEBUG(
         "report.tp[%d].contact = %d, report.tp[i].x = %d, "
         "report.tp[i].y = %d, report.tp[i].height = %d, "
@@ -414,14 +443,14 @@ static inline void u2hts_handle_touch() {
   U2HTS_LOG_DEBUG("report.scan_time = %d, report.tp_count = %d",
                   u2hts_report.scan_time, u2hts_report.tp_count);
 #ifdef CFG_TUSB_MCU
-  U2HTS_SET_BIT(u2hts_status_mask, 1,
-                u2hts_usb_report(&u2hts_report, U2HTS_HID_TP_REPORT_ID));
+  U2HTS_SET_DATA_REMAIN_FLAG(
+      u2hts_usb_report(&u2hts_report, U2HTS_HID_TP_REPORT_ID));
 #else
   u2hts_report.report_id = U2HTS_HID_TP_REPORT_ID;
   u2hts_usb_report(&u2hts_report, U2HTS_HID_TP_REPORT_ID);
 #endif
   u2hts_previous_report = u2hts_report;
-  U2HTS_SET_BIT(u2hts_status_mask, 5, !(u2hts_previous_report.tp_count == 0));
+  U2HTS_SET_TPS_REMAIN_FLAG((u2hts_previous_report.tp_count > 0));
   u2hts_tps_release_timeout = 0;
 }
 
@@ -431,19 +460,20 @@ inline void u2hts_main() {
 #endif
 
 #ifdef U2HTS_ENABLE_BUTTON
-  if (U2HTS_CHECK_BIT(u2hts_status_mask, 3))
+  if (U2HTS_GET_CONFIG_MODE_FLAG())
     u2hts_handle_config();
   else {
     if (u2hts_read_button())
-      U2HTS_SET_BIT(u2hts_status_mask, 3, u2hts_get_button_timeout(1000));
+      U2HTS_SET_CONFIG_MODE_FLAG(u2hts_get_button_timeout(1000));
     else {
 #endif
-      if (U2HTS_CHECK_BIT(u2hts_status_mask, 5)) {
+      if (U2HTS_GET_TPS_REMAIN_FLAG()) {
         // 10 ms
         if (u2hts_tps_release_timeout > U2HTS_TPS_RELEASE_TIMEOUT &&
-            U2HTS_CHECK_BIT(u2hts_status_mask, 2))
+            U2HTS_GET_TRANSFER_DONE_FLAG()) {
+          U2HTS_LOG_DEBUG("releasing remain tps");
           u2hts_handle_touch();
-        else {
+        } else {
           u2hts_delay_us(1);
           u2hts_tps_release_timeout++;
         }
@@ -458,20 +488,20 @@ inline void u2hts_main() {
 #ifdef U2HTS_POLLING
           false
 #else
-          U2HTS_CHECK_BIT(u2hts_status_mask, 0)
+          U2HTS_GET_IRQ_STATUS_FLAG()
 #endif
       );
 #endif
 
 #ifndef CFG_TUSB_MCU
-      U2HTS_SET_BIT(u2hts_status_mask, 2, u2hts_get_usb_status());
+      U2HTS_SET_TRANSFER_DONE_FLAG(u2hts_get_usb_status());
 #endif
 
 #ifndef U2HTS_POLLING
-      if ((u2hts_status_mask & 0x05) == 0x05)
+      if (U2HTS_GET_IRQ_STATUS_FLAG() && U2HTS_GET_TRANSFER_DONE_FLAG())
 #else
 #ifdef CFG_TUSB_MCU
-  if (U2HTS_CHECK_BIT(u2hts_status_mask, 2))
+  if (U2HTS_GET_TRANSFER_DONE_FLAG())
 #endif
 #endif
         u2hts_handle_touch();

@@ -108,30 +108,15 @@ inline static void ft54x6_coord_fetch(u2hts_config *cfg,
                                       u2hts_hid_report *report) {
   uint8_t tp_count = ft54x6_read_byte(FT54X6_TP_COUNT_REG);
   if (tp_count == 0) return;
+  tp_count = (tp_count < cfg->max_tps) ? tp_count : cfg->max_tps;
   ft54x6_tp_data tp[tp_count];
   ft54x6_i2c_read(FT54X6_TP_DATA_START_REG, &tp, sizeof(tp));
   report->tp_count = tp_count;
   for (uint8_t i = 0; i < tp_count; i++) {
-    uint8_t tp_id = tp[i].y_h >> 4;
-    uint16_t x = (tp[i].x_h & 0xF) << 8 | tp[i].x_l;
-    uint16_t y = (tp[i].y_h & 0xF) << 8 | tp[i].y_l;
     report->tp[i].contact = (tp[i].x_h >> 6 == 0x02);
-    report->tp[i].id = tp_id;
-    x = (x > cfg->x_max) ? cfg->x_max : x;
-    y = (y > cfg->y_max) ? cfg->y_max : y;
-    report->tp[i].x = U2HTS_MAP_VALUE(x, cfg->x_max, U2HTS_LOGICAL_MAX);
-    report->tp[i].y = U2HTS_MAP_VALUE(y, cfg->y_max, U2HTS_LOGICAL_MAX);
-    if (cfg->x_y_swap) {
-      report->tp[i].x ^= report->tp[i].y;
-      report->tp[i].y ^= report->tp[i].x;
-      report->tp[i].x ^= report->tp[i].y;
-    }
-
-    if (cfg->x_invert) report->tp[i].x = U2HTS_LOGICAL_MAX - report->tp[i].x;
-
-    if (cfg->y_invert) report->tp[i].y = U2HTS_LOGICAL_MAX - report->tp[i].y;
-    report->tp[i].width = 0x10;
-    report->tp[i].height = 0x10;
-    report->tp[i].pressure = 0x30;
+    report->tp[i].id = tp[i].y_h >> 4;
+    report->tp[i].x = (tp[i].x_h & 0xF) << 8 | tp[i].x_l;
+    report->tp[i].y = (tp[i].y_h & 0xF) << 8 | tp[i].y_l;
+    u2hts_apply_config_to_tp(cfg, &report->tp[i]);
   }
 }

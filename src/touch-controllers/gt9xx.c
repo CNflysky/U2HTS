@@ -102,31 +102,11 @@ static void gt9xx_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report) {
   for (uint8_t i = 0; i < tp_count; i++) {
     report->tp[i].id = tp_data[i].track_id & 0xF;
     report->tp[i].contact = true;
-    tp_data[i].x_coord =
-        (tp_data[i].x_coord > cfg->x_max) ? cfg->x_max : tp_data[i].x_coord;
-    tp_data[i].y_coord =
-        (tp_data[i].y_coord > cfg->y_max) ? cfg->y_max : tp_data[i].y_coord;
-
-    report->tp[i].x =
-        U2HTS_MAP_VALUE(tp_data[i].x_coord, cfg->x_max, U2HTS_LOGICAL_MAX);
-    report->tp[i].y =
-        U2HTS_MAP_VALUE(tp_data[i].y_coord, cfg->y_max, U2HTS_LOGICAL_MAX);
-
-    if (cfg->x_y_swap) {
-      report->tp[i].x ^= report->tp[i].y;
-      report->tp[i].y ^= report->tp[i].x;
-      report->tp[i].x ^= report->tp[i].y;
-    }
-
-    if (cfg->x_invert) report->tp[i].x = U2HTS_LOGICAL_MAX - report->tp[i].x;
-
-    if (cfg->y_invert) report->tp[i].y = U2HTS_LOGICAL_MAX - report->tp[i].y;
-
-    report->tp[i].width =
-        (tp_data[i].point_size_w) ? tp_data[i].point_size_w : 0x30;
-    report->tp[i].height =
-        (tp_data[i].point_size_h) ? tp_data[i].point_size_h : 0x30;
-    report->tp[i].pressure = 0x30;
+    report->tp[i].x = tp_data[i].x_coord;
+    report->tp[i].y = tp_data[i].y_coord;
+    report->tp[i].width = tp_data[i].point_size_w;
+    report->tp[i].height = tp_data[i].point_size_h;
+    u2hts_apply_config_to_tp(cfg, &report->tp[i]);
   }
 }
 

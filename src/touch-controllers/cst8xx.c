@@ -17,9 +17,9 @@ static u2hts_touch_controller_operations cst8xx_ops = {
     .get_config = &cst8xx_get_config};
 
 static u2hts_touch_controller cst8xx = {.name = (uint8_t *)"cst8xx",
-                                         .i2c_addr = 0x15,
-                                         .irq_flag = U2HTS_IRQ_TYPE_FALLING,
-                                         .operations = &cst8xx_ops};
+                                        .i2c_addr = 0x15,
+                                        .irq_flag = U2HTS_IRQ_TYPE_FALLING,
+                                        .operations = &cst8xx_ops};
 
 U2HTS_TOUCH_CONTROLLER(cst8xx);
 
@@ -67,31 +67,16 @@ static inline bool cst8xx_setup() {
 }
 
 static inline void cst8xx_coord_fetch(u2hts_config *cfg,
-                                       u2hts_hid_report *report) {
+                                      u2hts_hid_report *report) {
   if (!cst8xx_read_byte(CST8XX_FINGER_NUM_REG)) return;
   report->tp_count = 1;
   cst8xx_tp_data tp = {0x00};
-  cst8xx_i2c_read(0x03, &tp, sizeof(tp));
-  uint16_t x = (tp.x_h & 0xF) << 8 | tp.x_l;
-  uint16_t y = (tp.y_h & 0xF) << 8 | tp.y_l;
+  cst8xx_i2c_read(CST8XX_TP_DATA_START_REG, &tp, sizeof(tp));
   report->tp[0].contact = true;
   report->tp[0].id = 0;
-  x = (x > cfg->x_max) ? cfg->x_max : x;
-  y = (y > cfg->y_max) ? cfg->y_max : y;
-  report->tp[0].x = U2HTS_MAP_VALUE(x, cfg->x_max, U2HTS_LOGICAL_MAX);
-  report->tp[0].y = U2HTS_MAP_VALUE(y, cfg->y_max, U2HTS_LOGICAL_MAX);
-  if (cfg->x_y_swap) {
-    report->tp[0].x ^= report->tp[0].y;
-    report->tp[0].y ^= report->tp[0].x;
-    report->tp[0].x ^= report->tp[0].y;
-  }
-
-  if (cfg->x_invert) report->tp[0].x = U2HTS_LOGICAL_MAX - report->tp[0].x;
-
-  if (cfg->y_invert) report->tp[0].y = U2HTS_LOGICAL_MAX - report->tp[0].y;
-  report->tp[0].width = 0x30;
-  report->tp[0].height = 0x30;
-  report->tp[0].pressure = 0x30;
+  report->tp[0].x = (tp.x_h & 0xF) << 8 | tp.x_l;
+  report->tp[0].y = (tp.y_h & 0xF) << 8 | tp.y_l;
+  u2hts_apply_config_to_tp(cfg, &report->tp[0]);
 }
 
 static inline u2hts_touch_controller_config cst8xx_get_config() {
