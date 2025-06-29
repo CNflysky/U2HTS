@@ -20,7 +20,7 @@ int main() {
       U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID, "Touchscreen config"));
   // controller name
   bi_decl(bi_ptr_string(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
-                        controller, "s7501b", 32));
+                        controller, "gt9xx", 32));
   // invert X axis
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
                        x_invert, false));

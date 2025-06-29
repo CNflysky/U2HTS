@@ -447,6 +447,10 @@ inline static void u2hts_handle_touch() {
 #else
   u2hts_report.report_id = U2HTS_HID_TP_REPORT_ID;
   u2hts_usb_report(&u2hts_report, U2HTS_HID_TP_REPORT_ID);
+#ifdef U2HTS_POLLING
+  // make sure there are enough time for usb peripheral to tranfer HID packets.
+  u2hts_delay_ms(2);
+#endif
 #endif
   u2hts_previous_report = u2hts_report;
   U2HTS_SET_TPS_REMAIN_FLAG((u2hts_previous_report.tp_count > 0));
