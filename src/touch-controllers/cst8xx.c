@@ -51,14 +51,14 @@ inline static uint8_t cst8xx_read_byte(uint8_t reg) {
   return var;
 }
 
-static inline bool cst8xx_setup() {
+inline static bool cst8xx_setup() {
   u2hts_tprst_set(false);
   u2hts_delay_ms(100);
   u2hts_tprst_set(true);
   u2hts_delay_ms(50);
   bool ret = u2hts_i2c_detect_slave(cst8xx.i2c_addr);
   if (!ret) return ret;
-  cst8xx_product_info info = {0x00};
+  cst8xx_product_info info = {0};
   cst8xx_i2c_read(CST8XX_PRODUCT_INFO_START_REG, &info, sizeof(info));
   U2HTS_LOG_INFO(
       "chip_id = 0x%x, ProjID = 0x%x, fw_ver = 0x%x, vendor_id = 0x%x",
@@ -66,11 +66,11 @@ static inline bool cst8xx_setup() {
   return true;
 }
 
-static inline void cst8xx_coord_fetch(u2hts_config *cfg,
+inline static void cst8xx_coord_fetch(u2hts_config *cfg,
                                       u2hts_hid_report *report) {
   if (!cst8xx_read_byte(CST8XX_FINGER_NUM_REG)) return;
   report->tp_count = 1;
-  cst8xx_tp_data tp = {0x00};
+  cst8xx_tp_data tp = {0};
   cst8xx_i2c_read(CST8XX_TP_DATA_START_REG, &tp, sizeof(tp));
   report->tp[0].contact = true;
   report->tp[0].id = 0;
@@ -79,7 +79,7 @@ static inline void cst8xx_coord_fetch(u2hts_config *cfg,
   u2hts_apply_config_to_tp(cfg, &report->tp[0]);
 }
 
-static inline u2hts_touch_controller_config cst8xx_get_config() {
+inline static u2hts_touch_controller_config cst8xx_get_config() {
   u2hts_touch_controller_config cfg = {
       .max_tps = 1, .x_max = 240, .y_max = 283};
   return cfg;

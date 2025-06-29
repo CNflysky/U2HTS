@@ -7,7 +7,7 @@
 
 #include "rmi_common.h"
 static uint8_t rmi_current_page = 0x00;
-static rmi_pdt f01 = {0x00};
+static rmi_pdt f01 = {0};
 static uint8_t rmi_max_tps = 0;
 void rmi_i2c_read(uint8_t slave_addr, uint16_t reg, void *data,
                   size_t data_size) {
@@ -60,7 +60,7 @@ inline int8_t rmi_fetch_pdt(uint8_t slave_addr, uint8_t func_id, rmi_pdt *p) {
   uint8_t pdt_int_count = 0;
   uint8_t func_int_index = 0;
   for (uint8_t i = RMI_PDT_TOP; i > RMI_PDT_BOTTOM; i -= RMI_PDT_SIZE) {
-    rmi_pdt pdt = {0x00};
+    rmi_pdt pdt = {0};
     rmi_i2c_read(slave_addr, i, &pdt, RMI_PDT_SIZE);
     if (pdt.func_num > 0) pdt_int_count += pdt.func_info & 7;
     if (pdt.func_num == RMI_FUNC_F01) f01 = pdt;
@@ -69,7 +69,7 @@ inline int8_t rmi_fetch_pdt(uint8_t slave_addr, uint8_t func_id, rmi_pdt *p) {
       *p = pdt;
     }
     if (pdt.func_num == 0x00) empty_pdts++;
-    if (empty_pdts >= 2)
+    if (empty_pdts > 2)
       return (f01.func_num == RMI_FUNC_F01 && p->func_num == func_id)
                  ? func_int_index
                  : -1;
@@ -84,7 +84,7 @@ inline void rmi_f01_setup(uint8_t slave_addr) {
   // write f01 ctrl reg 7 "configured" bit
   rmi_f01_ctrl_write(slave_addr, 0, 0x80);
 
-  rmi_f01_product_info info = {0x00};
+  rmi_f01_product_info info = {0};
   rmi_i2c_read(slave_addr, f01.query_base, &info, sizeof(info));
   info.product_id[10] = '\0';
 

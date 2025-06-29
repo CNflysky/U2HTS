@@ -96,7 +96,7 @@ inline static bool ft54x6_setup() {
   u2hts_delay_ms(200);
   bool ret = u2hts_i2c_detect_slave(ft54x6.i2c_addr);
   if (!ret) return ret;
-  ft54x6_product_info info = {0x00};
+  ft54x6_product_info info = {0};
   ft54x6_i2c_read(FT54X6_PRODUCT_INFO_START_REG, &info, sizeof(info));
   U2HTS_LOG_INFO(
       "fwver_h = 0x%x, fwver_l = 0x%x, vendor_id = 0x%x, fw_id = 0x%x",

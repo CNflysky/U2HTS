@@ -97,7 +97,7 @@ inline static void rmi_cmd_write(uint8_t slave_addr, rmi_pdt *pdt,
   rmi_i2c_write(slave_addr, pdt->cmd_base + offset, &value, sizeof(value));
 }
 
-static inline void rmi_print_product_info(rmi_f01_product_info *info) {
+inline static void rmi_print_product_info(rmi_f01_product_info *info) {
   U2HTS_LOG_INFO(
       "Manufacturer: %s, product: %s, product spec[0-1]: 0x%x, 0x%x, product "
       "date: %d/%d/%d, tester_id: 0x%x, serialno: %d",

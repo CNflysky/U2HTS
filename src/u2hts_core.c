@@ -58,8 +58,8 @@ static uint32_t u2hts_tps_release_timeout = 0;
 #define U2HTS_GET_TPS_REMAIN_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 4)
 
 static uint8_t u2hts_status_mask = 0x00;
-static u2hts_hid_report u2hts_report = {0x00};
-static u2hts_hid_report u2hts_previous_report = {0x00};
+static u2hts_hid_report u2hts_report = {0};
+static u2hts_hid_report u2hts_previous_report = {0};
 static uint16_t u2hts_tp_ids_mask = 0;
 
 #ifdef CFG_TUSB_MCU
@@ -384,11 +384,10 @@ inline void u2hts_init(u2hts_config *cfg) {
 #ifndef U2HTS_POLLING
   u2hts_ts_irq_setup(touch_controller);
 #endif
-
   U2HTS_LOG_DEBUG("Exit %s", __func__);
 }
 
-static inline void u2hts_handle_touch() {
+inline static void u2hts_handle_touch() {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   memset(&u2hts_report, 0x00, sizeof(u2hts_report));
   for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].id = 0xFF;

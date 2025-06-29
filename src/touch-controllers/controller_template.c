@@ -76,7 +76,7 @@ inline static void mycontroller_write_byte(uint16_t reg, uint8_t data) {
   mycontroller_i2c_write(reg, &data, sizeof(data));
 }
 
-static inline bool mycontroller_setup() {
+inline static bool mycontroller_setup() {
   // do hardware reset
   // 进行硬件复位
   u2hts_tprst_set(false);
@@ -94,7 +94,7 @@ static inline bool mycontroller_setup() {
   return true;
 }
 
-static inline void mycontroller_coord_fetch(u2hts_config *cfg,
+inline static void mycontroller_coord_fetch(u2hts_config *cfg,
                                             u2hts_hid_report *report) {
   // this function will be called immediately when touch interrupt (ATTN)
   // triggered. some controller require clear it's internal interrupt flag after
@@ -130,8 +130,8 @@ static inline void mycontroller_coord_fetch(u2hts_config *cfg,
   // 不需要填写report->scan_time, u2hts_core.c会处理它
 }
 
-static inline u2hts_touch_controller_config mycontroller_get_config() {
-  mycontroller_config mycfg = {0x00};
+inline static u2hts_touch_controller_config mycontroller_get_config() {
+  mycontroller_config mycfg = {0};
   mycontroller_i2c_read(MYCONTROLLER_CONFIG_START_REG, &mycfg, sizeof(mycfg));
   u2hts_touch_controller_config cfg = {
       .max_tps = mycfg.max_tps, .x_max = mycfg.x_max, .y_max = mycfg.y_max};

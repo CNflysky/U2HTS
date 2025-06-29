@@ -61,6 +61,10 @@ inline static void u2hts_pins_init() {
 
   gpio_init(U2HTS_USR_KEY);
   gpio_set_dir(U2HTS_USR_KEY, GPIO_IN);
+
+  gpio_init(7);
+  gpio_set_dir(7 ,GPIO_OUT);
+  gpio_put(7, false);
 }
 
 inline static void u2hts_tpint_set(bool value) {

@@ -80,14 +80,14 @@ inline static void gt9xx_write_byte(uint16_t reg, uint8_t data) {
 }
 
 static u2hts_touch_controller_config gt9xx_get_config() {
-  gt9xx_config cfg = {0x00};
+  gt9xx_config cfg = {0};
   gt9xx_i2c_read(GT9XX_CONFIG_START_REG, &cfg, sizeof(cfg));
   u2hts_touch_controller_config u2hts_tc_cfg = {
       .max_tps = cfg.max_tps, .x_max = cfg.x_max, .y_max = cfg.y_max};
   return u2hts_tc_cfg;
 }
 
-static inline void gt9xx_clear_irq() {
+inline static void gt9xx_clear_irq() {
   gt9xx_write_byte(GT9XX_TP_COUNT_REG, 0);
 }
 
@@ -118,8 +118,9 @@ static bool gt9xx_setup() {
   u2hts_delay_ms(50);
 
   bool ret = u2hts_i2c_detect_slave(gt9xx.i2c_addr);
+  if (!ret) return ret;
 
-  gt9xx_product_info info = {0x00};
+  gt9xx_product_info info = {0};
   gt9xx_i2c_read(GT9XX_PRODUCT_INFO_START_REG, &info, sizeof(info));
   U2HTS_LOG_INFO(
       "gt9xx Product ID: %c%c%c%c, CID: %d, patch_ver: %d.%d, mask_ver: "

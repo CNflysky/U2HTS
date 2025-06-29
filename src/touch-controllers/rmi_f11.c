@@ -96,7 +96,7 @@ static void rmi_f11_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report) {
 }
 
 static u2hts_touch_controller_config rmi_f11_get_config() {
-  u2hts_touch_controller_config config = {0x00};
+  u2hts_touch_controller_config config = {0};
   uint8_t tps = rmi_f11_query_read(1) & 0x7;
   config.max_tps = (tps <= 4) ? tps + 1 : 10;
   rmi_f11_max_tps = config.max_tps;
@@ -116,7 +116,7 @@ static bool rmi_f11_setup() {
   if (!u2hts_i2c_detect_slave(rmi_f11.i2c_addr)) return false;
 
   int8_t f11_index = rmi_fetch_pdt(rmi_f11.i2c_addr, RMI_FUNC_F11, &f11);
-  if (!f11_index) {
+  if (f11_index < 0) {
     U2HTS_LOG_ERROR("Failed to fetch F01/F11 PDT from device");
     return false;
   }
