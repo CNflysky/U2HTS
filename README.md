@@ -5,6 +5,7 @@ USB HID multitouch touchscreen based on RP2040.
 
 # Features
 - Support max 10 touch points
+- Support match touch controller automatically
 - Support change touchscreen orientation
 - Support automatically configure touchscreen resolution
 - Support switch config in runtime via button
@@ -12,7 +13,8 @@ USB HID multitouch touchscreen based on RP2040.
 - Support persistent config
 
 # Touch controllers
-| Vendor | Series | Max TPs | Auto configuration | Test | Code |
+**Note**: If the `Controller name` is configured as `auto`, the system will scan all I2C slaves on the I2C bus, match the **first detected I2C slave** with an **integrated controller driver**, and initialise it. Be advised that **different controllers may have same I2C address** or **different drivers may register same I2C address**. If an incorrect controller match occurs, please manually configure the `Controller name`.  
+| Vendor | Series | Max TPs | Auto configuration | Test | Controller name |
 | --- | --- | --- | --- | --- | --- |
 | Goodix | `GT9xx` | 10 | okay | GT5688 | `Goodix` |
 | Synaptics | `RMI4-F11-I2C` | 10 | okay | S7300B | `rmi_f11` |
@@ -70,7 +72,7 @@ Install `VS code` and `Raspberry Pi Pico` plugin, import this repository, then b
 You can config touchscreen via `picotool` without recompiling the binary on RP series platforms.
 | Config | Name | Value |
 | --- | --- | --- |
-| Controller | `controller` | refer `src/touch-controllers` dir |
+| Controller name | `controller` | refer `Touch controllers` section |
 | Invert X axis | `x_invert` | 0/1 |
 | Invert Y axis | `y_invert` | 0/1 |
 | Swap X&Y axis | `x_y_swap` | 0/1 |

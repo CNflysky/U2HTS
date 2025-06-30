@@ -58,6 +58,11 @@ target_include_directories(U2HTS PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
+# print memory usage after linking
+target_link_options(U2HTS PRIVATE
+    -Wl,--print-memory-usage
+)
+
 # Add any user requested libraries
 target_link_libraries(U2HTS 
         hardware_i2c
@@ -67,4 +72,3 @@ target_link_libraries(U2HTS
         )
 pico_set_linker_script(U2HTS ${CMAKE_CURRENT_LIST_DIR}/memmap_u2hts.ld)
 pico_add_extra_outputs(U2HTS)
-

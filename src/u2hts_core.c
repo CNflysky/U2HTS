@@ -281,12 +281,38 @@ inline static void u2hts_handle_config() {
 
 #endif
 
-inline static u2hts_touch_controller *u2hts_get_touch_controller(
+inline static uint8_t u2hts_scan_touch_controller() {
+  uint8_t addr = 0x00;
+  // we assume only 1 i2c slave on the i2c bus
+  for (uint8_t i = 0x00; i < 0x7F; i++)
+    if (u2hts_i2c_detect_slave(i)) return i;
+  return 0;
+}
+
+inline static u2hts_touch_controller *u2hts_get_touch_controller_by_name(
     const uint8_t *name) {
   for (u2hts_touch_controller **tc = &__u2hts_touch_controllers_begin;
        tc < &__u2hts_touch_controllers_end; tc++)
     if (!strcmp((const char *)(*tc)->name, (const char *)name)) return *tc;
   return NULL;
+}
+
+inline static u2hts_touch_controller *u2hts_get_touch_controller_by_addr(
+    const uint8_t addr) {
+  for (u2hts_touch_controller **tc = &__u2hts_touch_controllers_begin;
+       tc < &__u2hts_touch_controllers_end; tc++)
+    if ((*tc)->i2c_addr == addr) return *tc;
+  return NULL;
+}
+
+inline static void u2hts_list_supported_touch_controllers() {
+#if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_INFO
+  printf("INFO: Supported controllers:");
+  for (u2hts_touch_controller **tc = &__u2hts_touch_controllers_begin;
+       tc < &__u2hts_touch_controllers_end; tc++)
+    printf(" %s", (*tc)->name);
+  printf("\n");
+#endif
 }
 
 void u2hts_apply_config_to_tp(u2hts_config *cfg, u2hts_tp *tp) {
@@ -309,29 +335,8 @@ void u2hts_apply_config_to_tp(u2hts_config *cfg, u2hts_tp *tp) {
 inline void u2hts_init(u2hts_config *cfg) {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   config = cfg;
-
-#ifdef U2HTS_ENABLE_PERSISTENT_CONFIG
-  if (u2hts_config_exists())
-    u2hts_load_config(config);
-  else
-    u2hts_save_config(config);
-#endif
-
-  touch_controller = u2hts_get_touch_controller(cfg->controller);
-  if (!touch_controller) {
-    U2HTS_LOG_ERROR("Failed to get controller by name %s", cfg->controller);
-    while (1)
-#ifdef U2HTS_ENABLE_LED
-      U2HTS_LED_DISPLAY_PATTERN(long_flash, 1);
-#endif
-    ;
-  }
-#ifdef U2HTS_ENABLE_LED
-  else
-    U2HTS_LED_DISPLAY_PATTERN(ultrashort_flash, 2);
-#endif
-  U2HTS_LOG_INFO("U2HTS for %s, built @ %s %s with feature%s",
-                 touch_controller->name, __DATE__, __TIME__,
+  U2HTS_LOG_INFO("U2HTS firmware built @ %s %s with feature%s", __DATE__,
+                 __TIME__,
                  ""
 #ifdef U2HTS_POLLING
                  " U2HTS_POLLING"
@@ -346,6 +351,55 @@ inline void u2hts_init(u2hts_config *cfg) {
                  " U2HTS_ENABLE_PERSISTENT_CONFIG"
 #endif
   );
+  u2hts_list_supported_touch_controllers();
+#ifdef U2HTS_ENABLE_PERSISTENT_CONFIG
+  if (u2hts_config_exists())
+    u2hts_load_config(config);
+  else
+    u2hts_save_config(config);
+#endif
+
+  if (!strcmp(config->controller, "auto")) {
+    uint8_t addr = 0x00;
+    if (config->i2c_addr) {
+      U2HTS_LOG_INFO("Matching touch controller with addr 0x%x",
+                     config->i2c_addr);
+      addr = config->i2c_addr;
+    } else {
+      U2HTS_LOG_INFO("Scanning for i2c devices...");
+      addr = u2hts_scan_touch_controller();
+    }
+    if (addr == 0x00)
+      U2HTS_LOG_ERROR("No controller was found on i2c bus");
+    else {
+      touch_controller = u2hts_get_touch_controller_by_addr(addr);
+      if (!touch_controller)
+        U2HTS_LOG_ERROR(
+            "No touch controller with i2c addr 0x%x compatible was found",
+            addr);
+      else {
+        U2HTS_LOG_INFO("Found controller %s @ addr 0x%x",
+                       touch_controller->name, addr);
+        U2HTS_LOG_INFO(
+            "If controller mismatched, try specify controller name in config");
+      }
+    }
+  } else {
+    U2HTS_LOG_INFO("Controller: %s", cfg->controller);
+    touch_controller = u2hts_get_touch_controller_by_name(cfg->controller);
+  }
+  if (!touch_controller) {
+    U2HTS_LOG_ERROR("Failed to get touch controller");
+    while (1)
+#ifdef U2HTS_ENABLE_LED
+      U2HTS_LED_DISPLAY_PATTERN(long_flash, 1);
+#endif
+    ;
+  }
+#ifdef U2HTS_ENABLE_LED
+  else
+    U2HTS_LED_DISPLAY_PATTERN(ultrashort_flash, 2);
+#endif
 
   touch_controller->i2c_addr =
       (config->i2c_addr) ? config->i2c_addr : touch_controller->i2c_addr;
@@ -353,8 +407,6 @@ inline void u2hts_init(u2hts_config *cfg) {
   touch_controller->irq_flag =
       (config->irq_flag) ? config->irq_flag : touch_controller->irq_flag;
 
-  U2HTS_LOG_INFO("Controller I2C address: 0x%x", touch_controller->i2c_addr);
-  U2HTS_LOG_INFO("Controller IRQ flag: 0x%x", touch_controller->irq_flag);
   // setup controller
   if (!touch_controller->operations->setup()) {
     U2HTS_LOG_ERROR("Failed to setup controller: %s", touch_controller->name);
@@ -449,7 +501,7 @@ inline static void u2hts_handle_touch() {
   u2hts_usb_report(&u2hts_report, U2HTS_HID_TP_REPORT_ID);
 #ifdef U2HTS_POLLING
   // make sure there are enough time for usb peripheral to tranfer HID packets.
-  u2hts_delay_ms(2);
+  u2hts_delay_ms(U2HTS_POLLING_USB_TRANSFER_TIME);
 #endif
 #endif
   u2hts_previous_report = u2hts_report;
