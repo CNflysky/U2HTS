@@ -9,7 +9,8 @@
 #include "u2hts_core.h"
 
 static bool gt9xx_setup();
-static void gt9xx_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report);
+static void gt9xx_coord_fetch(const u2hts_config *cfg,
+                              u2hts_hid_report *report);
 static u2hts_touch_controller_config gt9xx_get_config();
 
 static u2hts_touch_controller_operations gt9xx_ops = {
@@ -17,8 +18,9 @@ static u2hts_touch_controller_operations gt9xx_ops = {
     .fetch = &gt9xx_coord_fetch,
     .get_config = &gt9xx_get_config};
 
-static u2hts_touch_controller gt9xx = {.name = (uint8_t *)"gt9xx",
+static u2hts_touch_controller gt9xx = {.name = "gt9xx",
                                        .i2c_addr = 0x5d,
+                                       .alt_i2c_addr = 0x14,
                                        .irq_flag = U2HTS_IRQ_TYPE_FALLING,
                                        .operations = &gt9xx_ops};
 
@@ -91,7 +93,8 @@ inline static void gt9xx_clear_irq() {
   gt9xx_write_byte(GT9XX_TP_COUNT_REG, 0);
 }
 
-static void gt9xx_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report) {
+static void gt9xx_coord_fetch(const u2hts_config *cfg,
+                              u2hts_hid_report *report) {
   uint8_t tp_count = gt9xx_read_byte(GT9XX_TP_COUNT_REG) & 0xF;
   gt9xx_clear_irq();
   if (tp_count == 0) return;
@@ -116,9 +119,12 @@ static bool gt9xx_setup() {
   u2hts_delay_ms(100);
   u2hts_tprst_set(true);
   u2hts_delay_ms(50);
-
-  bool ret = u2hts_i2c_detect_slave(gt9xx.i2c_addr);
-  if (!ret) return ret;
+  // i2c addr should be 0x5d now.
+  if (!u2hts_i2c_detect_slave(gt9xx.i2c_addr))
+    if (u2hts_i2c_detect_slave(gt9xx.alt_i2c_addr))
+      gt9xx.i2c_addr = gt9xx.alt_i2c_addr;
+    else
+      return false;
 
   gt9xx_product_info info = {0};
   gt9xx_i2c_read(GT9XX_PRODUCT_INFO_START_REG, &info, sizeof(info));
@@ -130,5 +136,5 @@ static bool gt9xx_setup() {
       info.mask_ver_major, info.mask_ver_minor);
   gt9xx_clear_irq();
   u2hts_delay_ms(100);
-  return ret;
+  return true;
 }

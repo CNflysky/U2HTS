@@ -219,18 +219,15 @@ inline void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
   U2HTS_SET_TRANSFER_DONE_FLAG(
       (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE));
 }
-
-#else
-inline uint8_t u2hts_get_max_tps() { return config->max_tps; }
 #endif
 
-#ifndef U2HTS_POLLING
+inline uint8_t u2hts_get_max_tps() { return config->max_tps; }
+
 inline void u2hts_ts_irq_status_set(bool status) {
   u2hts_ts_irq_set(false);
   U2HTS_LOG_DEBUG("ts irq triggered");
   U2HTS_SET_IRQ_STATUS_FLAG(status);
 }
-#endif
 
 #ifdef U2HTS_ENABLE_BUTTON
 
@@ -282,7 +279,6 @@ inline static void u2hts_handle_config() {
 #endif
 
 inline static uint8_t u2hts_scan_touch_controller() {
-  uint8_t addr = 0x00;
   // we assume only 1 i2c slave on the i2c bus
   for (uint8_t i = 0x00; i < 0x7F; i++)
     if (u2hts_i2c_detect_slave(i)) return i;
@@ -290,10 +286,10 @@ inline static uint8_t u2hts_scan_touch_controller() {
 }
 
 inline static u2hts_touch_controller *u2hts_get_touch_controller_by_name(
-    const uint8_t *name) {
+    const char *name) {
   for (u2hts_touch_controller **tc = &__u2hts_touch_controllers_begin;
        tc < &__u2hts_touch_controllers_end; tc++)
-    if (!strcmp((const char *)(*tc)->name, (const char *)name)) return *tc;
+    if (!strcmp((*tc)->name, name)) return *tc;
   return NULL;
 }
 
@@ -301,11 +297,11 @@ inline static u2hts_touch_controller *u2hts_get_touch_controller_by_addr(
     const uint8_t addr) {
   for (u2hts_touch_controller **tc = &__u2hts_touch_controllers_begin;
        tc < &__u2hts_touch_controllers_end; tc++)
-    if ((*tc)->i2c_addr == addr) return *tc;
+    if ((*tc)->i2c_addr == addr || (*tc)->alt_i2c_addr == addr) return *tc;
   return NULL;
 }
 
-inline static void u2hts_list_supported_touch_controllers() {
+inline static void u2hts_list_touch_controller() {
 #if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_INFO
   printf("INFO: Supported controllers:");
   for (u2hts_touch_controller **tc = &__u2hts_touch_controllers_begin;
@@ -315,7 +311,7 @@ inline static void u2hts_list_supported_touch_controllers() {
 #endif
 }
 
-void u2hts_apply_config_to_tp(u2hts_config *cfg, u2hts_tp *tp) {
+void u2hts_apply_config_to_tp(const u2hts_config *cfg, u2hts_tp *tp) {
   tp->x = (tp->x > cfg->x_max) ? cfg->x_max : tp->x;
   tp->y = (tp->y > cfg->y_max) ? cfg->y_max : tp->y;
   tp->x = U2HTS_MAP_VALUE(tp->x, cfg->x_max, U2HTS_LOGICAL_MAX);
@@ -351,7 +347,7 @@ inline void u2hts_init(u2hts_config *cfg) {
                  " U2HTS_ENABLE_PERSISTENT_CONFIG"
 #endif
   );
-  u2hts_list_supported_touch_controllers();
+  u2hts_list_touch_controller();
 #ifdef U2HTS_ENABLE_PERSISTENT_CONFIG
   if (u2hts_config_exists())
     u2hts_load_config(config);
@@ -416,16 +412,31 @@ inline void u2hts_init(u2hts_config *cfg) {
 #endif
     ;
   }
-  u2hts_touch_controller_config tc_config =
-      touch_controller->operations->get_config();
-  U2HTS_LOG_INFO(
-      "Controller config: max_tps = %d, x_max = %d, y_max = "
-      "%d",
-      tc_config.max_tps, tc_config.x_max, tc_config.y_max);
 
-  config->x_max = (config->x_max) ? config->x_max : tc_config.x_max;
-  config->y_max = (config->y_max) ? config->y_max : tc_config.y_max;
-  config->max_tps = (config->max_tps) ? config->max_tps : tc_config.max_tps;
+  u2hts_touch_controller_config tc_config = {0};
+
+  if (touch_controller->operations->get_config) {
+    tc_config = touch_controller->operations->get_config();
+    U2HTS_LOG_INFO(
+        "Controller config: max_tps = %d, x_max = %d, y_max = "
+        "%d",
+        tc_config.max_tps, tc_config.x_max, tc_config.y_max);
+
+    config->x_max = (config->x_max) ? config->x_max : tc_config.x_max;
+    config->y_max = (config->y_max) ? config->y_max : tc_config.y_max;
+    config->max_tps = (config->max_tps) ? config->max_tps : tc_config.max_tps;
+  } else {
+    if (config->x_max < 0 || config->y_max < 0 && config->max_tps < 0) {
+      U2HTS_LOG_ERROR(
+          "Controller does not support auto configuration, but x/y coords or "
+          "max_tps are not configured");
+      while (1) {
+#ifdef U2HTS_ENABLE_LED
+        U2HTS_LED_DISPLAY_PATTERN(ultrashort_flash, 1);
+#endif
+      };
+    }
+  }
 
   U2HTS_LOG_INFO(
       "U2HTS config: x_max = %d, y_max = %d, max_tps = %d, x_y_swap = %d, "
@@ -434,7 +445,7 @@ inline void u2hts_init(u2hts_config *cfg) {
       config->x_invert, config->y_invert);
   u2hts_usb_init();
 #ifndef U2HTS_POLLING
-  u2hts_ts_irq_setup(touch_controller);
+  u2hts_ts_irq_setup(touch_controller->irq_flag);
 #endif
   U2HTS_LOG_DEBUG("Exit %s", __func__);
 }
@@ -499,10 +510,6 @@ inline static void u2hts_handle_touch() {
 #else
   u2hts_report.report_id = U2HTS_HID_TP_REPORT_ID;
   u2hts_usb_report(&u2hts_report, U2HTS_HID_TP_REPORT_ID);
-#ifdef U2HTS_POLLING
-  // make sure there are enough time for usb peripheral to tranfer HID packets.
-  u2hts_delay_ms(U2HTS_POLLING_USB_TRANSFER_TIME);
-#endif
 #endif
   u2hts_previous_report = u2hts_report;
   U2HTS_SET_TPS_REMAIN_FLAG((u2hts_previous_report.tp_count > 0));
@@ -552,13 +559,13 @@ inline void u2hts_main() {
       U2HTS_SET_TRANSFER_DONE_FLAG(u2hts_get_usb_status());
 #endif
 
+      if (
 #ifndef U2HTS_POLLING
-      if (U2HTS_GET_IRQ_STATUS_FLAG() && U2HTS_GET_TRANSFER_DONE_FLAG())
+          U2HTS_GET_IRQ_STATUS_FLAG() && U2HTS_GET_TRANSFER_DONE_FLAG()
 #else
-#ifdef CFG_TUSB_MCU
-  if (U2HTS_GET_TRANSFER_DONE_FLAG())
+      U2HTS_GET_TRANSFER_DONE_FLAG()
 #endif
-#endif
+      )
         u2hts_handle_touch();
 #ifdef U2HTS_ENABLE_BUTTON
     }

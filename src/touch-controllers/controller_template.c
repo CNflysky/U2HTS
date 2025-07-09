@@ -9,17 +9,19 @@
 
 #include "u2hts_core.h"
 static bool mycontroller_setup();
-static void mycontroller_coord_fetch(u2hts_config *cfg,
+static void mycontroller_coord_fetch(const u2hts_config *cfg,
                                      u2hts_hid_report *report);
 static u2hts_touch_controller_config mycontroller_get_config();
 
 static u2hts_touch_controller_operations mycontroller_ops = {
     .setup = &mycontroller_setup,
     .fetch = &mycontroller_coord_fetch,
+    // if your controller does not supports auto config, leave this empty
+    // 如果你的控制器不支持自动获取配置，请将下面这条函数留空
     .get_config = &mycontroller_get_config};
 
 static u2hts_touch_controller mycontroller = {
-    .name = (uint8_t *)"mycontroller",   // controller name 控制器名称
+    .name = "mycontroller",   // controller name 控制器名称
     .i2c_addr = 0xFF,                    // I2C slave addr I2C从机地址
     .irq_flag = U2HTS_IRQ_TYPE_FALLING,  // irq flag 中断标志
     .operations = &mycontroller_ops};
@@ -94,7 +96,7 @@ inline static bool mycontroller_setup() {
   return true;
 }
 
-inline static void mycontroller_coord_fetch(u2hts_config *cfg,
+inline static void mycontroller_coord_fetch(const u2hts_config *cfg,
                                             u2hts_hid_report *report) {
   // this function will be called immediately when touch interrupt (ATTN)
   // triggered. some controller require clear it's internal interrupt flag after

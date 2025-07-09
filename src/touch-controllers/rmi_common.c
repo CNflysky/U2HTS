@@ -8,7 +8,6 @@
 #include "rmi_common.h"
 static uint8_t rmi_current_page = 0x00;
 static rmi_pdt f01 = {0};
-static uint8_t rmi_max_tps = 0;
 void rmi_i2c_read(uint8_t slave_addr, uint16_t reg, void *data,
                   size_t data_size) {
   if (rmi_current_page != reg >> 8) {

@@ -9,18 +9,18 @@
 #define _U2HTS_RP2040_H_
 
 #include "bsp/board_api.h"
+#include "hardware/flash.h"
 #include "hardware/i2c.h"
+#include "pico/flash.h"
 #include "pico/stdlib.h"
 #include "tusb.h"
 #include "tusb_config.h"
 
 #define U2HTS_ENABLE_LED
-// #define U2HTS_ENABLE_PERSISTENT_CONFIG
+#define U2HTS_ENABLE_PERSISTENT_CONFIG
 #define U2HTS_ENABLE_BUTTON
 
 // #define U2HTS_POLLING
-
-#define U2HTS_POLLING_USB_TRANSFER_TIME 2
 
 #define U2HTS_CONFIG_TIMEOUT 5 * 1000  // 5 s
 
@@ -39,6 +39,8 @@
 #define U2HTS_TP_RST 5
 
 #define U2HTS_USR_KEY 9
+// last page
+#define U2HTS_CONFIG_STORAGE_OFFSET PICO_FLASH_SIZE_BYTES - 8192
 
 inline static void u2hts_pins_init() {
   gpio_set_function(U2HTS_I2C_SCL, GPIO_FUNC_I2C);
@@ -92,9 +94,26 @@ inline static void u2hts_led_set(bool on) {
   gpio_put(PICO_DEFAULT_LED_PIN, on);
 }
 
-// not implemented yet
-inline static void u2hts_write_config(uint16_t cfg) { (void)cfg; }
-inline static uint16_t u2hts_read_config() { return 0; }
+inline static void u2hts_rp2040_flash_erase(void *param) {
+  (void)param;
+  flash_range_erase(U2HTS_CONFIG_STORAGE_OFFSET, FLASH_SECTOR_SIZE);
+}
+
+inline static void u2hts_rp2040_flash_write(void *param) {
+  uint8_t flash_program_buf[FLASH_PAGE_SIZE] = {0};
+  flash_program_buf[0] = *(uintptr_t *)param;
+  flash_range_program(U2HTS_CONFIG_STORAGE_OFFSET, flash_program_buf,
+                      FLASH_PAGE_SIZE);
+}
+
+inline static void u2hts_write_config(uint16_t cfg) {
+  flash_safe_execute(u2hts_rp2040_flash_erase, NULL, 0xFFFF);
+  flash_safe_execute(u2hts_rp2040_flash_write, &cfg, 0xFFFF);
+}
+
+inline static uint16_t u2hts_read_config() {
+  return *(uint16_t *)(XIP_BASE + U2HTS_CONFIG_STORAGE_OFFSET);
+}
 
 inline static bool u2hts_read_button() { return gpio_get(U2HTS_USR_KEY); }
 #endif

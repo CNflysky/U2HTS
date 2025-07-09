@@ -8,15 +8,13 @@
 
 #include "u2hts_core.h"
 static bool cst8xx_setup();
-static void cst8xx_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report);
-static u2hts_touch_controller_config cst8xx_get_config();
+static void cst8xx_coord_fetch(const u2hts_config *cfg, u2hts_hid_report *report);
 
 static u2hts_touch_controller_operations cst8xx_ops = {
     .setup = &cst8xx_setup,
-    .fetch = &cst8xx_coord_fetch,
-    .get_config = &cst8xx_get_config};
+    .fetch = &cst8xx_coord_fetch};
 
-static u2hts_touch_controller cst8xx = {.name = (uint8_t *)"cst8xx",
+static u2hts_touch_controller cst8xx = {.name = "cst8xx",
                                         .i2c_addr = 0x15,
                                         .irq_flag = U2HTS_IRQ_TYPE_FALLING,
                                         .operations = &cst8xx_ops};
@@ -66,7 +64,7 @@ inline static bool cst8xx_setup() {
   return true;
 }
 
-inline static void cst8xx_coord_fetch(u2hts_config *cfg,
+inline static void cst8xx_coord_fetch(const u2hts_config *cfg,
                                       u2hts_hid_report *report) {
   if (!cst8xx_read_byte(CST8XX_FINGER_NUM_REG)) return;
   report->tp_count = 1;
@@ -77,10 +75,4 @@ inline static void cst8xx_coord_fetch(u2hts_config *cfg,
   report->tp[0].x = (tp.x_h & 0xF) << 8 | tp.x_l;
   report->tp[0].y = (tp.y_h & 0xF) << 8 | tp.y_l;
   u2hts_apply_config_to_tp(cfg, &report->tp[0]);
-}
-
-inline static u2hts_touch_controller_config cst8xx_get_config() {
-  u2hts_touch_controller_config cfg = {
-      .max_tps = 1, .x_max = 240, .y_max = 283};
-  return cfg;
 }

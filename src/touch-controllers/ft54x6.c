@@ -1,50 +1,25 @@
 /*
   Copyright (C) CNflysky.
   U2HTS stands for "USB to HID TouchScreen".
-  ft54x6.c: ft54x6/ft3x68 driver
+  ft54x6.c: ft54x6 driver
   This file is licensed under GPL V3.
   All rights reserved.
 */
 
 #include "u2hts_core.h"
 static bool ft54x6_setup();
-static void ft54x6_coord_fetch(u2hts_config *cfg, u2hts_hid_report *report);
-
-static u2hts_touch_controller_config ft54x6_get_config() {
-  u2hts_touch_controller_config cfg = {
-      .max_tps = 5, .x_max = 540, .y_max = 960};
-  return cfg;
-}
+static void ft54x6_coord_fetch(const u2hts_config *cfg,
+                               u2hts_hid_report *report);
 
 static u2hts_touch_controller_operations ft54x6_ops = {
-    .setup = &ft54x6_setup,
-    .fetch = &ft54x6_coord_fetch,
-    .get_config = &ft54x6_get_config};
+    .setup = &ft54x6_setup, .fetch = &ft54x6_coord_fetch};
 
-static u2hts_touch_controller ft54x6 = {.name = (uint8_t *)"ft54x6",
+static u2hts_touch_controller ft54x6 = {.name = "ft54x6",
                                         .i2c_addr = 0x38,
                                         .irq_flag = U2HTS_IRQ_TYPE_FALLING,
                                         .operations = &ft54x6_ops};
 
 U2HTS_TOUCH_CONTROLLER(ft54x6);
-
-static u2hts_touch_controller_config ft3x68_get_config() {
-  u2hts_touch_controller_config cfg = {
-      .max_tps = 2, .x_max = 235, .y_max = 280};
-  return cfg;
-}
-
-static u2hts_touch_controller_operations ft3x68_ops = {
-    .setup = &ft54x6_setup,
-    .fetch = &ft54x6_coord_fetch,
-    .get_config = &ft3x68_get_config};
-
-static u2hts_touch_controller ft3x68 = {.name = (uint8_t *)"ft3x68",
-                                        .i2c_addr = 0x38,
-                                        .irq_flag = U2HTS_IRQ_TYPE_FALLING,
-                                        .operations = &ft3x68_ops};
-
-U2HTS_TOUCH_CONTROLLER(ft3x68);
 
 typedef struct {
   uint8_t x_h;
@@ -104,7 +79,7 @@ inline static bool ft54x6_setup() {
   return ret;
 }
 
-inline static void ft54x6_coord_fetch(u2hts_config *cfg,
+inline static void ft54x6_coord_fetch(const u2hts_config *cfg,
                                       u2hts_hid_report *report) {
   uint8_t tp_count = ft54x6_read_byte(FT54X6_TP_COUNT_REG);
   if (tp_count == 0) return;

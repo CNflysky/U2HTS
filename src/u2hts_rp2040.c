@@ -67,22 +67,25 @@ inline void u2hts_rp2040_irq_cb(uint gpio, uint32_t event_mask) {
   u2hts_ts_irq_status_set(gpio == U2HTS_TP_INT && (event_mask & irq_flag));
 }
 
-inline void u2hts_ts_irq_setup(u2hts_touch_controller *ctrler) {
+inline void u2hts_ts_irq_setup(uint8_t irq_flag) {
   gpio_deinit(U2HTS_TP_INT);
-  gpio_pull_up(U2HTS_TP_INT);
-  switch (ctrler->irq_flag) {
+  switch (irq_flag) {
     case U2HTS_IRQ_TYPE_LOW:
       irq_flag = GPIO_IRQ_LEVEL_LOW;
+      gpio_pull_up(U2HTS_TP_INT);
       break;
     case U2HTS_IRQ_TYPE_HIGH:
       irq_flag = GPIO_IRQ_LEVEL_HIGH;
+      gpio_pull_down(U2HTS_TP_INT);
       break;
     case U2HTS_IRQ_TYPE_RISING:
       irq_flag = GPIO_IRQ_EDGE_RISE;
+      gpio_pull_down(U2HTS_TP_INT);
       break;
     case U2HTS_IRQ_TYPE_FALLING:
     default:
       irq_flag = GPIO_IRQ_EDGE_FALL;
+      gpio_pull_up(U2HTS_TP_INT);
       break;
   }
   gpio_set_irq_enabled_with_callback(U2HTS_TP_INT, irq_flag, true,
@@ -90,6 +93,6 @@ inline void u2hts_ts_irq_setup(u2hts_touch_controller *ctrler) {
 }
 
 #endif
-inline bool u2hts_usb_report(u2hts_hid_report *report, uint8_t report_id) {
+inline bool u2hts_usb_report(void *report, uint8_t report_id) {
   return tud_hid_report(report_id, report, CFG_TUD_HID_EP_BUFSIZE - 1);
 }
