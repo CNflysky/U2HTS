@@ -50,7 +50,7 @@ void rmi_clear_irq(uint8_t slave_addr);
 void rmi_enable_irq(uint8_t slave_addr, uint8_t irq_index);
 
 inline static void rmi_set_page(uint8_t slave_addr, uint8_t page) {
-  u2hts_i2c_write(slave_addr, page, sizeof(page), NULL, 0);
+  u2hts_i2c_mem_write(slave_addr, page, sizeof(page), NULL, 0);
 }
 
 void rmi_i2c_read(uint8_t slave_addr, uint16_t reg, void *data,

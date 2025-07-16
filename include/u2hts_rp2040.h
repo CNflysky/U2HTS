@@ -20,11 +20,9 @@
 #define U2HTS_ENABLE_PERSISTENT_CONFIG
 #define U2HTS_ENABLE_BUTTON
 
-// #define U2HTS_POLLING
-
 #define U2HTS_CONFIG_TIMEOUT 5 * 1000  // 5 s
 
-#define U2HTS_LOG_LEVEL U2HTS_LOG_LEVEL_INFO
+#define U2HTS_LOG_LEVEL U2HTS_LOG_LEVEL_DEBUG
 
 #define U2HTS_SWAP16(x) __builtin_bswap16(x)
 
@@ -42,18 +40,28 @@
 // last page
 #define U2HTS_CONFIG_STORAGE_OFFSET PICO_FLASH_SIZE_BYTES - 8192
 
+inline static bool u2hts_i2c_write(uint8_t slave_addr, void *buf, size_t len) {
+  return (i2c_write_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)buf, len,
+                               false, U2HTS_I2C_TIMEOUT) == len);
+}
+
+inline static bool u2hts_i2c_read(uint8_t slave_addr, void *buf, size_t len) {
+  return (i2c_read_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)buf, len, false,
+                              U2HTS_I2C_TIMEOUT) == len);
+}
+
 inline static void u2hts_pins_init() {
   gpio_set_function(U2HTS_I2C_SCL, GPIO_FUNC_I2C);
   gpio_set_function(U2HTS_I2C_SDA, GPIO_FUNC_I2C);
   gpio_pull_up(U2HTS_I2C_SDA);
   gpio_pull_up(U2HTS_I2C_SCL);
 
-  i2c_init(U2HTS_I2C, 400 * 1000);  // 400 KHz
+  i2c_init(U2HTS_I2C, 100 * 1000);  // 100 KHz
 
   // some touch contoller requires ATTN signal in specified state while
   // resetting.
-  gpio_set_function(U2HTS_TP_RST, GPIO_FUNC_SIO);
-  gpio_set_dir(U2HTS_TP_RST, GPIO_OUT);
+  gpio_set_function(U2HTS_TP_INT, GPIO_FUNC_SIO);
+  gpio_set_dir(U2HTS_TP_INT, GPIO_OUT);
   gpio_put(U2HTS_TP_INT, true);
 
   gpio_set_function(U2HTS_TP_RST, GPIO_FUNC_SIO);
@@ -73,9 +81,8 @@ inline static void u2hts_tpint_set(bool value) {
 
 inline static bool u2hts_i2c_detect_slave(uint8_t addr) {
   uint8_t rx = 0;
-  int8_t error = i2c_read_timeout_us(U2HTS_I2C, addr, &rx, sizeof(rx), false,
-                                     U2HTS_I2C_TIMEOUT);
-  return (error < 0) ? false : true;
+  return i2c_read_timeout_us(U2HTS_I2C, addr, &rx, sizeof(rx), false,
+                             U2HTS_I2C_TIMEOUT) >= 0;
 }
 
 inline static void u2hts_tprst_set(bool value) {
@@ -116,4 +123,6 @@ inline static uint16_t u2hts_read_config() {
 }
 
 inline static bool u2hts_read_button() { return gpio_get(U2HTS_USR_KEY); }
+void u2hts_rp2040_irq_cb(uint gpio, uint32_t event_mask);
+
 #endif

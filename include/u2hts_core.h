@@ -165,6 +165,7 @@ typedef struct {
   uint16_t y_max;
   uint8_t max_tps;
   uint8_t irq_flag;
+  bool polling_mode;
 } u2hts_config;
 
 typedef struct {
@@ -183,10 +184,13 @@ typedef struct {
 
 void u2hts_init(u2hts_config *cfg);
 void u2hts_main();
+uint8_t u2hts_get_max_tps();
+void u2hts_i2c_mem_write(uint8_t slave_addr, uint32_t mem_addr,
+                         size_t mem_addr_size, void *data, size_t data_len);
+void u2hts_i2c_mem_read(uint8_t slave_addr, uint32_t mem_addr,
+                        size_t mem_addr_size, void *data, size_t data_len);
+void u2hts_ts_irq_status_set(bool status);
 
-#ifdef PICO_RP2040
-void u2hts_rp2040_irq_cb(uint gpio, uint32_t event_mask);
-#endif
 void u2hts_apply_config_to_tp(const u2hts_config *cfg, u2hts_tp *tp);
 #ifdef U2HTS_ENABLE_LED
 typedef struct {

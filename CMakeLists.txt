@@ -71,7 +71,7 @@ target_link_libraries(U2HTS
         tinyusb_board
         )
 
-target_compile_options(U2HTS PRIVATE -Wunused-value -Wunused-function -Wunused-variable)
+target_compile_options(U2HTS PRIVATE -Wunused)
 
 pico_set_linker_script(U2HTS ${CMAKE_CURRENT_LIST_DIR}/memmap_u2hts.ld)
 pico_add_extra_outputs(U2HTS)

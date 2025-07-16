@@ -60,12 +60,12 @@ typedef struct __packed {
 
 inline static void mycontroller_i2c_read(uint16_t reg, void *data,
                                          size_t data_size) {
-  u2hts_i2c_read(mycontroller.i2c_addr, reg, sizeof(reg), data, data_size);
+  u2hts_i2c_mem_read(mycontroller.i2c_addr, reg, sizeof(reg), data, data_size);
 }
 
 inline static void mycontroller_i2c_write(uint16_t reg, void *data,
                                           size_t data_size) {
-  u2hts_i2c_write(mycontroller.i2c_addr, reg, sizeof(reg), data, data_size);
+  u2hts_i2c_mem_write(mycontroller.i2c_addr, reg, sizeof(reg), data, data_size);
 }
 
 inline static uint8_t mycontroller_read_byte(uint16_t reg) {

@@ -229,6 +229,52 @@ inline void u2hts_ts_irq_status_set(bool status) {
   U2HTS_SET_IRQ_STATUS_FLAG(status);
 }
 
+void u2hts_i2c_mem_write(uint8_t slave_addr, uint32_t mem_addr,
+                         size_t mem_addr_size, void *data, size_t data_len) {
+  uint8_t tx_buf[mem_addr_size + data_len];
+  uint32_t mem_addr_be = 0x00;
+  switch (mem_addr_size) {
+    case sizeof(uint16_t):
+      mem_addr_be = U2HTS_SWAP16(mem_addr);
+      break;
+    case sizeof(uint32_t):
+      mem_addr_be = U2HTS_SWAP32(mem_addr);
+      break;
+    default:
+      mem_addr_be = mem_addr;
+      break;
+  }
+  memcpy(tx_buf, &mem_addr_be, mem_addr_size);
+  memcpy(tx_buf + mem_addr_size, data, data_len);
+  bool ret = u2hts_i2c_write(slave_addr, tx_buf, sizeof(tx_buf));
+  if (!ret)
+    U2HTS_LOG_ERROR("%s error, reg = 0x%x, ret = %d", __func__, mem_addr, ret);
+}
+
+void u2hts_i2c_mem_read(uint8_t slave_addr, uint32_t mem_addr,
+                        size_t mem_addr_size, void *data, size_t data_len) {
+  uint32_t mem_addr_be = 0x00;
+  switch (mem_addr_size) {
+    case sizeof(uint16_t):
+      mem_addr_be = U2HTS_SWAP16(mem_addr);
+      break;
+    case sizeof(uint32_t):
+      mem_addr_be = U2HTS_SWAP32(mem_addr);
+      break;
+    default:
+      mem_addr_be = mem_addr;
+      break;
+  }
+  bool ret = u2hts_i2c_write(slave_addr, &mem_addr_be, mem_addr_size);
+  if (!ret)
+    U2HTS_LOG_ERROR("%s write error, addr = 0x%x, ret = %d", __func__, mem_addr,
+                    ret);
+
+  ret = u2hts_i2c_read(slave_addr, data, data_len);
+  if (!ret)
+    U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d", __func__, mem_addr, ret);
+}
+
 #ifdef U2HTS_ENABLE_BUTTON
 
 inline static bool u2hts_get_button_timeout(uint32_t ms) {
@@ -334,9 +380,6 @@ inline void u2hts_init(u2hts_config *cfg) {
   U2HTS_LOG_INFO("U2HTS firmware built @ %s %s with feature%s", __DATE__,
                  __TIME__,
                  ""
-#ifdef U2HTS_POLLING
-                 " U2HTS_POLLING"
-#endif
 #ifdef U2HTS_ENABLE_LED
                  " U2HTS_ENABLE_LED"
 #endif
@@ -426,7 +469,7 @@ inline void u2hts_init(u2hts_config *cfg) {
     config->y_max = (config->y_max) ? config->y_max : tc_config.y_max;
     config->max_tps = (config->max_tps) ? config->max_tps : tc_config.max_tps;
   } else {
-    if (config->x_max < 0 || config->y_max < 0 && config->max_tps < 0) {
+    if (config->x_max == 0 || config->y_max == 0 || config->max_tps == 0) {
       U2HTS_LOG_ERROR(
           "Controller does not support auto configuration, but x/y coords or "
           "max_tps are not configured");
@@ -440,13 +483,12 @@ inline void u2hts_init(u2hts_config *cfg) {
 
   U2HTS_LOG_INFO(
       "U2HTS config: x_max = %d, y_max = %d, max_tps = %d, x_y_swap = %d, "
-      "x_invert = %d, y_invert = %d",
+      "x_invert = %d, y_invert = %d, polling_mode = %d",
       config->x_max, config->y_max, config->max_tps, config->x_y_swap,
-      config->x_invert, config->y_invert);
+      config->x_invert, config->y_invert, config->polling_mode);
   u2hts_usb_init();
-#ifndef U2HTS_POLLING
-  u2hts_ts_irq_setup(touch_controller->irq_flag);
-#endif
+  if (!config->polling_mode) u2hts_ts_irq_setup(touch_controller->irq_flag);
+
   U2HTS_LOG_DEBUG("Exit %s", __func__);
 }
 
@@ -458,14 +500,15 @@ inline static void u2hts_handle_touch() {
 
   uint8_t tp_count = u2hts_report.tp_count;
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
-#ifndef U2HTS_POLLING
-  U2HTS_SET_IRQ_STATUS_FLAG(0);
-#endif
+  U2HTS_SET_IRQ_STATUS_FLAG(!config->polling_mode);
   if (tp_count == 0 && u2hts_previous_report.tp_count == 0) return;
 
-#if defined(U2HTS_POLLING) && defined(U2HTS_ENABLE_LED)
-  u2hts_led_set(true);
+  if (config->polling_mode) {
+#ifdef U2HTS_ENABLE_LED
+    u2hts_led_set(true);
 #endif
+  }
+
   U2HTS_SET_TRANSFER_DONE_FLAG(0);
   u2hts_report.scan_time = u2hts_get_scan_time();
 
@@ -541,32 +584,20 @@ inline void u2hts_main() {
         }
       }
 
-#ifndef U2HTS_POLLING
-      u2hts_ts_irq_set(true);
-#endif
+      u2hts_ts_irq_set(!config->polling_mode);
 
 #ifdef U2HTS_ENABLE_LED
-      u2hts_led_set(
-#ifdef U2HTS_POLLING
-          false
-#else
-          U2HTS_GET_IRQ_STATUS_FLAG()
-#endif
-      );
+      u2hts_led_set(config->polling_mode ? false : U2HTS_GET_IRQ_STATUS_FLAG());
 #endif
 
 #ifndef CFG_TUSB_MCU
       U2HTS_SET_TRANSFER_DONE_FLAG(u2hts_get_usb_status());
 #endif
 
-      if (
-#ifndef U2HTS_POLLING
-          U2HTS_GET_IRQ_STATUS_FLAG() && U2HTS_GET_TRANSFER_DONE_FLAG()
-#else
-      U2HTS_GET_TRANSFER_DONE_FLAG()
-#endif
-      )
+      if ((config->polling_mode ? 1 : U2HTS_GET_IRQ_STATUS_FLAG()) &&
+          U2HTS_GET_IRQ_STATUS_FLAG())
         u2hts_handle_touch();
+
 #ifdef U2HTS_ENABLE_BUTTON
     }
   }

@@ -15,7 +15,7 @@ void rmi_i2c_read(uint8_t slave_addr, uint16_t reg, void *data,
     rmi_set_page(slave_addr, page);
     rmi_current_page = page;
   }
-  u2hts_i2c_read(slave_addr, reg & 0xFF, 1, data, data_size);
+  u2hts_i2c_mem_read(slave_addr, reg & 0xFF, 1, data, data_size);
 }
 
 void rmi_i2c_write(uint8_t slave_addr, uint16_t reg, void *data,
@@ -25,7 +25,7 @@ void rmi_i2c_write(uint8_t slave_addr, uint16_t reg, void *data,
     rmi_set_page(slave_addr, page);
     rmi_current_page = page;
   }
-  u2hts_i2c_write(slave_addr, reg & 0xFF, 1, data, data_size);
+  u2hts_i2c_mem_write(slave_addr, reg & 0xFF, 1, data, data_size);
 }
 
 inline static uint8_t rmi_f01_ctrl_read(uint8_t slave_addr, uint16_t offset) {

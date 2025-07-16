@@ -40,7 +40,7 @@ typedef struct {
 } cst8xx_product_info;
 
 inline static void cst8xx_i2c_read(uint8_t reg, void *data, size_t data_size) {
-  u2hts_i2c_read(cst8xx.i2c_addr, reg, sizeof(reg), data, data_size);
+  u2hts_i2c_mem_read(cst8xx.i2c_addr, reg, sizeof(reg), data, data_size);
 }
 
 inline static uint8_t cst8xx_read_byte(uint8_t reg) {

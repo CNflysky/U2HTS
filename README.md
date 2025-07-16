@@ -7,19 +7,19 @@ USB HID multitouch touchscreen based on RP2040.
 - Support max 10 touch points
 - Support match touch controller automatically
 - Support change touchscreen orientation
-- Support automatically configure touchscreen resolution
+- Support automatically configure touchscreen parameters(need controller support)
 - Support switch config in runtime via button
 - Support indicates system status by LED patterns
 - Support persistent config
 
 # Touch controllers
-**Note**: If the `Controller name` is configured as `auto`, the system will scan all I2C slaves on the I2C bus, match the **first detected I2C slave** with an **integrated controller driver**, and initialise it. Be advised that **different controllers may have same I2C address** or **different drivers may register same I2C address**. If an incorrect controller match occurs, please manually configure the `Controller name`.  
-| Vendor | Series | Max TPs | Auto configuration | Test | Controller name |
-| --- | --- | --- | --- | --- | --- |
-| Goodix | `GT9xx` | 10 | okay | GT5688 | `Goodix` |
-| Synaptics | `RMI4-F11-I2C` | 10 | okay | S7300B | `rmi_f11` |
-| Focaltech | `FT3x68`, `FT54x6` | 2 | NO | ft3168, ft5406 | `ft3x68`, `ft54x6` |
-| Hynitron | `CST8xx` | 1 | NO | cst816d | `cst8xx` |
+**Note**: If the `Controller name` is configured as `auto`, then every available slave address on I2C bus will be scanned, match the **first detected I2C slave** with an **integrated controller driver**, and initialise it. Be advised that **different controllers may have same I2C address** or **different drivers may register same I2C address**. If an incorrect controller match occurs, please manually configure the `Controller name`.  
+| Vendor | Series | Auto configuration | Test | Controller name |
+| --- | --- | --- | --- | --- |
+| Goodix | `GT9xx` | Y | GT5688 | `gt9xx` |
+| Synaptics | `RMI4-F11-I2C` | Y | S7300B | `rmi_f11` |
+| Focaltech | `FT54x6` | N | ft3168, ft5406 |  `ft54x6` |
+| Hynitron | `CST8xx` | N | cst816d | `cst8xx` |
 
 # Configs
 | Config | Invert X axis | Invert Y axis | Swap X Y axes |
@@ -54,6 +54,7 @@ System will save config if no operation performed in a specified delay.
 | --- | --- | --- | --- |
 | RP2040 | Y | N | Y |
 | [STM32F070F6](https://github.com/CNflysky/U2HTS_F070F6) | Y | Y | Y |
+| CH32X033F8 | Y | Y | Y |
 
 # RP Circuit
 `u2hts_rp2040.h`: 
@@ -69,23 +70,23 @@ No external pull-up/pull-down resistors required.
 Install `VS code` and `Raspberry Pi Pico` plugin, import this repository, then build.
 
 # RP Config
-You can config touchscreen via `picotool` without recompiling the binary on RP series platforms.
+You can config touchscreen via `picotool` without rebuild firmware on RP series platforms.
 | Config | Name | Value |
 | --- | --- | --- |
 | Controller name | `controller` | refer `Touch controllers` section |
 | Invert X axis | `x_invert` | 0/1 |
 | Invert Y axis | `y_invert` | 0/1 |
 | Swap X&Y axis | `x_y_swap` | 0/1 |
+| Polling mode | `polling_mode` | 0/1 |
+| I2C slave address | `i2c_addr` | 7-bit device address |
 
-Normally the following configurations can be automatically obtained from touch controller.  
-You can manually specify them too:
+You must configure these value when using an controller that does NOT support auto-config:
 | Config | Name | Value |
 | --- | --- | --- |
 | Max touch points | `max_tps` | up to 10 |
 | X axis max | `x_max` | 65535 |
 | Y axis max | `y_max` | 65535 |
 | Interrupt flag | `irq_flag` | (1/2/3/4, refer `u2hts_core.h`) |
-| I2C slave address | `i2c_addr` | 7-bit device address |
 
 Example：
 ```bash
