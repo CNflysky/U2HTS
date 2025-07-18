@@ -12,7 +12,10 @@
 
 bool u2hts_i2c_write(uint8_t slave_addr, void *buf, size_t len);
 bool u2hts_i2c_read(uint8_t slave_addr, void *buf, size_t len);
+// true = out false = in
+void u2hts_tpint_set_mode(bool mode);
 void u2hts_tpint_set(bool value);
+bool u2hts_tpint_get();
 void u2hts_ts_irq_set(bool enable);
 void u2hts_ts_irq_setup(uint8_t irq_flag);
 bool u2hts_i2c_detect_slave(uint8_t addr);
@@ -26,7 +29,8 @@ uint16_t u2hts_get_scan_time();
 void u2hts_led_set(bool on);
 void u2hts_write_config(uint16_t cfg);
 uint16_t u2hts_read_config();
-bool u2hts_read_button();
+bool u2hts_key_read();
 // implement this when TinyUSB is not used
+// true = okay false = busy
 bool u2hts_get_usb_status();
 #endif

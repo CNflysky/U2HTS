@@ -122,7 +122,18 @@ inline static uint16_t u2hts_read_config() {
   return *(uint16_t *)(XIP_BASE + U2HTS_CONFIG_STORAGE_OFFSET);
 }
 
-inline static bool u2hts_read_button() { return gpio_get(U2HTS_USR_KEY); }
+inline static bool u2hts_key_read() { return gpio_get(U2HTS_USR_KEY); }
+
+inline static void u2hts_tpint_set_mode(bool mode) {
+  gpio_deinit(U2HTS_TP_INT);
+  gpio_set_function(U2HTS_TP_INT, GPIO_FUNC_SIO);
+  gpio_set_dir(U2HTS_TP_INT, mode);
+}
+
+inline static bool u2hts_tpint_get() {
+  return gpio_get(U2HTS_TP_INT);
+}
+
 void u2hts_rp2040_irq_cb(uint gpio, uint32_t event_mask);
 
 #endif

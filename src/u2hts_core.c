@@ -31,8 +31,6 @@ static u2hts_led_pattern short_flash[] = {{.state = true, .delay_ms = 250},
 
 static u2hts_led_pattern ultrashort_flash[] = {
     {.state = true, .delay_ms = 125}, {.state = false, .delay_ms = 125}};
-
-void u2hts_led_set(bool on);
 #endif
 static uint32_t u2hts_tps_release_timeout = 0;
 // union u2hts_status_mask {
@@ -278,9 +276,9 @@ void u2hts_i2c_mem_read(uint8_t slave_addr, uint32_t mem_addr,
 #ifdef U2HTS_ENABLE_BUTTON
 
 inline static bool u2hts_get_button_timeout(uint32_t ms) {
-  if (u2hts_read_button()) {
+  if (u2hts_key_read()) {
     u2hts_delay_ms(ms);
-    return u2hts_read_button();
+    return u2hts_key_read();
   } else
     return false;
 }
@@ -568,7 +566,7 @@ inline void u2hts_main() {
   if (U2HTS_GET_CONFIG_MODE_FLAG())
     u2hts_handle_config();
   else {
-    if (u2hts_read_button())
+    if (u2hts_key_read())
       U2HTS_SET_CONFIG_MODE_FLAG(u2hts_get_button_timeout(1000));
     else {
 #endif
@@ -595,7 +593,7 @@ inline void u2hts_main() {
 #endif
 
       if ((config->polling_mode ? 1 : U2HTS_GET_IRQ_STATUS_FLAG()) &&
-          U2HTS_GET_IRQ_STATUS_FLAG())
+          U2HTS_GET_TRANSFER_DONE_FLAG())
         u2hts_handle_touch();
 
 #ifdef U2HTS_ENABLE_BUTTON
