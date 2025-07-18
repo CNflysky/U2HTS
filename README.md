@@ -13,13 +13,7 @@ USB HID multitouch touchscreen based on RP2040.
 - Support persistent config
 
 # Touch controllers
-**Note**: If the `Controller name` is configured as `auto`, then every available slave address on I2C bus will be scanned, match the **first detected I2C slave** with an **integrated controller driver**, and initialise it. Be advised that **different controllers may have same I2C address** or **different drivers may register same I2C address**. If an incorrect controller match occurs, please manually configure the `Controller name`.  
-| Vendor | Series | Auto configuration | Test | Controller name |
-| --- | --- | --- | --- | --- |
-| Goodix | `GT9xx` | Y | GT5688 | `gt9xx` |
-| Synaptics | `RMI4-F11-I2C` | Y | S7300B | `rmi_f11` |
-| Focaltech | `FT54x6` | N | ft3168, ft5406 |  `ft54x6` |
-| Hynitron | `CST8xx` | N | cst816d | `cst8xx` |
+See [U2HTS touch controllers](https://github.com/CNflysky/u2hts_touch_controllers/blob/main/README.md)
 
 # Configs
 | Config | Invert X axis | Invert Y axis | Swap X Y axes |

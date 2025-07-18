@@ -12,14 +12,7 @@
 - 支持持久化保存配置
 
 # 触摸控制器
-**注意**: 如果将`控制器名`配置为`auto`，则固件会扫描i2c总线上的所有i2c从机地址，并将**第一个扫描到**的i2c从机与**已集成**的控制器驱动进行匹配并进行初始化。鉴于**不同的控制器可能拥有同一个i2c地址**或**不同的驱动可能注册了同一个i2c地址**，如果控制器匹配有误，请手动配置`控制器名`。    
-
-| 制造商 | 系列 | 自动配置 | 测试 | 控制器名 |
-| --- | --- | --- | --- | --- |
-| Goodix 汇顶 | `GT9xx` | 支持 | GT5688 | `gt9xx` |
-| Synaptics 新思 | `RMI4-F11-I2C` | 支持 | S7300B | `rmi_f11` |
-| Focaltech 敦泰 | `FT54x6` | 不支持 | ft3168，ft5406 | `ft54x6` |
-| Hynitron 海栎创 | `CST8xx` | 不支持 | cst816d | `cst8xx` |
+参考[U2HTS touch controllers](https://github.com/CNflysky/u2hts_touch_controllers/blob/main/README.md)
 
 # 配置
 内置4个配置：

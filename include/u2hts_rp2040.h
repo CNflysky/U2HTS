@@ -130,9 +130,7 @@ inline static void u2hts_tpint_set_mode(bool mode) {
   gpio_set_dir(U2HTS_TP_INT, mode);
 }
 
-inline static bool u2hts_tpint_get() {
-  return gpio_get(U2HTS_TP_INT);
-}
+inline static bool u2hts_tpint_get() { return gpio_get(U2HTS_TP_INT); }
 
 void u2hts_rp2040_irq_cb(uint gpio, uint32_t event_mask);
 
