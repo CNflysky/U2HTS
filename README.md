@@ -8,7 +8,7 @@ USB HID multitouch touchscreen based on RP2040.
 - Support match touch controller automatically
 - Support change touchscreen orientation
 - Support automatically configure touchscreen parameters(need controller support)
-- Support switch config in runtime via button
+- Support switch config in runtime via key
 - Support indicates system status by LED patterns
 - Support persistent config
 
@@ -37,14 +37,14 @@ See [U2HTS touch controllers](https://github.com/CNflysky/u2hts_touch_controller
 *always on*: Entered config mode  
 *ultrashort flash `n` times*: switching to `n`th config  
 
-# Button
+# Key
 *Enter config mode*: long press (>1 sec)  
 *Switch config*: short press  
 
 System will save config if no operation performed in a specified delay.  
 
 # Ports
-| MCU | Button | Persistent config | LED | 
+| MCU | Key | Persistent config | LED | 
 | --- | --- | --- | --- |
 | RP2040 | Y | N | Y |
 | [STM32F070F6](https://github.com/CNflysky/U2HTS_F070F6) | Y | Y | Y |

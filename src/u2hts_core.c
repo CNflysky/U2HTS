@@ -14,7 +14,7 @@ extern u2hts_touch_controller *__u2hts_touch_controllers_end;
 static u2hts_touch_controller *touch_controller = NULL;
 static u2hts_config *config = NULL;
 
-#ifdef U2HTS_ENABLE_BUTTON
+#ifdef U2HTS_ENABLE_KEY
 // default
 // x_invert, y_invert
 // x_y_swap, x_invert
@@ -273,9 +273,9 @@ void u2hts_i2c_mem_read(uint8_t slave_addr, uint32_t mem_addr,
     U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d", __func__, mem_addr, ret);
 }
 
-#ifdef U2HTS_ENABLE_BUTTON
+#ifdef U2HTS_ENABLE_KEY
 
-inline static bool u2hts_get_button_timeout(uint32_t ms) {
+inline static bool u2hts_get_key_timeout(uint32_t ms) {
   if (u2hts_key_read()) {
     u2hts_delay_ms(ms);
     return u2hts_key_read();
@@ -296,7 +296,7 @@ inline static void u2hts_handle_config() {
 #ifdef U2HTS_ENABLE_LED
     u2hts_led_set(true);
 #endif
-    if (u2hts_get_button_timeout(20)) {
+    if (u2hts_get_key_timeout(20)) {
       u2hts_config_timeout = 0;
       config_index =
           (config_index < sizeof(u2hts_config_masks) / sizeof(uint16_t) - 1)
@@ -381,8 +381,8 @@ inline void u2hts_init(u2hts_config *cfg) {
 #ifdef U2HTS_ENABLE_LED
                  " U2HTS_ENABLE_LED"
 #endif
-#ifdef U2HTS_ENABLE_BUTTON
-                 " U2HTS_ENABLE_BUTTON"
+#ifdef U2HTS_ENABLE_KEY
+                 " U2HTS_ENABLE_KEY"
 #endif
 #ifdef U2HTS_ENABLE_PERSISTENT_CONFIG
                  " U2HTS_ENABLE_PERSISTENT_CONFIG"
@@ -493,19 +493,13 @@ inline void u2hts_init(u2hts_config *cfg) {
 inline static void u2hts_handle_touch() {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   memset(&u2hts_report, 0x00, sizeof(u2hts_report));
-  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].id = 0xFF;
+  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].id = 0x7F;
   touch_controller->operations->fetch(config, &u2hts_report);
 
   uint8_t tp_count = u2hts_report.tp_count;
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
   U2HTS_SET_IRQ_STATUS_FLAG(!config->polling_mode);
   if (tp_count == 0 && u2hts_previous_report.tp_count == 0) return;
-
-  if (config->polling_mode) {
-#ifdef U2HTS_ENABLE_LED
-    u2hts_led_set(true);
-#endif
-  }
 
   U2HTS_SET_TRANSFER_DONE_FLAG(0);
   u2hts_report.scan_time = u2hts_get_scan_time();
@@ -562,12 +556,12 @@ inline void u2hts_main() {
   tud_task();
 #endif
 
-#ifdef U2HTS_ENABLE_BUTTON
+#ifdef U2HTS_ENABLE_KEY
   if (U2HTS_GET_CONFIG_MODE_FLAG())
     u2hts_handle_config();
   else {
     if (u2hts_key_read())
-      U2HTS_SET_CONFIG_MODE_FLAG(u2hts_get_button_timeout(1000));
+      U2HTS_SET_CONFIG_MODE_FLAG(u2hts_get_key_timeout(1000));
     else {
 #endif
       if (U2HTS_GET_TPS_REMAIN_FLAG()) {
@@ -585,7 +579,8 @@ inline void u2hts_main() {
       u2hts_ts_irq_set(!config->polling_mode);
 
 #ifdef U2HTS_ENABLE_LED
-      u2hts_led_set(config->polling_mode ? false : U2HTS_GET_IRQ_STATUS_FLAG());
+      u2hts_led_set(config->polling_mode ? false
+                                         : !U2HTS_GET_TRANSFER_DONE_FLAG());
 #endif
 
 #ifndef CFG_TUSB_MCU
@@ -596,7 +591,7 @@ inline void u2hts_main() {
           U2HTS_GET_TRANSFER_DONE_FLAG())
         u2hts_handle_touch();
 
-#ifdef U2HTS_ENABLE_BUTTON
+#ifdef U2HTS_ENABLE_KEY
     }
   }
 #endif

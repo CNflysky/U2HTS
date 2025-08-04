@@ -13,7 +13,6 @@
 #include <stdio.h>
 
 #include "u2hts_board.h"
-
 #define U2HTS_LOG_LEVEL_ERROR 0
 #define U2HTS_LOG_LEVEL_WARN 1
 #define U2HTS_LOG_LEVEL_INFO 2
@@ -75,7 +74,7 @@
 #define U2HTS_SET_BIT(val, bit, set) \
   ((set) ? ((val) |= (1U << (bit))) : ((val) &= ~(1U << (bit))))
 
-#define U2HTS_CHECK_BIT(val, bit) ((val) & (1 << (bit)))
+#define U2HTS_CHECK_BIT(val, bit) ((val >> (bit)) & 1)
 
 #define U2HTS_MAX_TPS 10
 
@@ -94,10 +93,9 @@
 
 #define U2HTS_HID_TP_DESC                                                     \
   HID_USAGE(0x22), HID_COLLECTION(HID_COLLECTION_LOGICAL), HID_USAGE(0x42),   \
-      HID_LOGICAL_MAX(1), HID_REPORT_SIZE(1), HID_REPORT_COUNT(1),            \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_REPORT_COUNT(7), \
-      HID_INPUT(HID_CONSTANT | HID_VARIABLE | HID_ABSOLUTE),                  \
-      HID_REPORT_SIZE(8), HID_USAGE(0x51), HID_REPORT_COUNT(1),               \
+      HID_LOGICAL_MAX(1), HID_LOGICAL_MIN(0), HID_REPORT_SIZE(1),             \
+      HID_REPORT_COUNT(1), HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), \
+      HID_USAGE(0x51), HID_REPORT_SIZE(7),                                    \
       HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                      \
       HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),                                 \
       HID_LOGICAL_MAX_N(U2HTS_LOGICAL_MAX, 2), HID_REPORT_SIZE(16),           \
@@ -131,8 +129,8 @@
       *u2hts_touch_controller_##controller = &controller
 
 typedef struct __packed {
-  bool contact;
-  uint8_t id;
+  bool contact : 1;
+  uint8_t id : 7;
   uint16_t x;
   uint16_t y;
   uint8_t width;
