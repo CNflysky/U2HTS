@@ -87,40 +87,6 @@
 #define U2HTS_HID_TP_REPORT_ID 1
 #define U2HTS_HID_TP_MAX_COUNT_ID 2
 
-#ifdef CFG_TUSB_MCU
-#define U2HTS_PHYSICAL_MAX_X 4096
-#define U2HTS_PHYSICAL_MAX_Y 4096
-
-#define U2HTS_HID_TP_DESC                                                     \
-  HID_USAGE(0x22), HID_COLLECTION(HID_COLLECTION_LOGICAL), HID_USAGE(0x42),   \
-      HID_LOGICAL_MAX(1), HID_LOGICAL_MIN(0), HID_REPORT_SIZE(1),             \
-      HID_REPORT_COUNT(1), HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), \
-      HID_USAGE(0x51), HID_REPORT_SIZE(7),                                    \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                      \
-      HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),                                 \
-      HID_LOGICAL_MAX_N(U2HTS_LOGICAL_MAX, 2), HID_REPORT_SIZE(16),           \
-      HID_USAGE(HID_USAGE_DESKTOP_X),                                         \
-      HID_PHYSICAL_MAX_N(U2HTS_PHYSICAL_MAX_X, 2),                            \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                      \
-      HID_PHYSICAL_MAX_N(U2HTS_PHYSICAL_MAX_Y, 2),                            \
-      HID_USAGE(HID_USAGE_DESKTOP_Y),                                         \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                      \
-      HID_USAGE_PAGE(HID_USAGE_PAGE_DIGITIZER), HID_LOGICAL_MAX_N(255, 2),    \
-      HID_PHYSICAL_MAX_N(255, 2), HID_REPORT_SIZE(8), HID_REPORT_COUNT(3),    \
-      HID_USAGE(0x48), HID_USAGE(0x49), HID_USAGE(0x30),                      \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_COLLECTION_END
-
-#define U2HTS_HID_TP_INFO_DESC                                                \
-  HID_LOGICAL_MAX_N(0xFFFF, 3), HID_REPORT_SIZE(16), HID_UNIT_EXPONENT(0x0C), \
-      HID_UNIT_N(0x1001, 2), HID_REPORT_COUNT(1), HID_USAGE(0x56),            \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_USAGE(0x54),     \
-      HID_LOGICAL_MAX(10), HID_REPORT_SIZE(8),                                \
-      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
-
-#define U2HTS_HID_TP_MAX_COUNT_DESC \
-  HID_USAGE(0x55), HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
-#endif
-
 #define U2HTS_TOUCH_CONTROLLER(controller)                                  \
   __attribute__((                                                           \
       __used__,                                                             \
@@ -139,9 +105,6 @@ typedef struct __packed {
 } u2hts_tp;
 
 typedef struct __packed {
-#ifndef CFG_TUSB_OS
-  uint8_t report_id;
-#endif
   u2hts_tp tp[U2HTS_MAX_TPS];
   uint16_t scan_time;
   uint8_t tp_count;
@@ -190,6 +153,8 @@ void u2hts_i2c_mem_read(uint8_t slave_addr, uint32_t mem_addr,
 void u2hts_ts_irq_status_set(bool status);
 
 void u2hts_apply_config_to_tp(const u2hts_config *cfg, u2hts_tp *tp);
+u2hts_hid_report *u2hts_get_report();
+
 #ifdef U2HTS_ENABLE_LED
 typedef struct {
   bool state;

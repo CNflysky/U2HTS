@@ -13,14 +13,16 @@ extern u2hts_touch_controller *__u2hts_touch_controllers_end;
 // global variables
 static u2hts_touch_controller *touch_controller = NULL;
 static u2hts_config *config = NULL;
-
-#ifdef U2HTS_ENABLE_KEY
+static uint32_t u2hts_tps_release_timeout = 0;
+static uint8_t u2hts_status_mask = 0x00;
+static u2hts_hid_report u2hts_report = {0};
+static u2hts_hid_report u2hts_previous_report = {0};
+static uint16_t u2hts_tp_ids_mask = 0;
 // default
 // x_invert, y_invert
 // x_y_swap, x_invert
 // x_y_swap, y_invert
 static uint16_t u2hts_config_masks[] = {0x0, 0x620, 0x320, 0x520};
-#endif
 
 #ifdef U2HTS_ENABLE_LED
 static u2hts_led_pattern long_flash[] = {{.state = true, .delay_ms = 1000},
@@ -32,194 +34,21 @@ static u2hts_led_pattern short_flash[] = {{.state = true, .delay_ms = 250},
 static u2hts_led_pattern ultrashort_flash[] = {
     {.state = true, .delay_ms = 125}, {.state = false, .delay_ms = 125}};
 #endif
-static uint32_t u2hts_tps_release_timeout = 0;
 // union u2hts_status_mask {
 //   struct {
 //     uint8_t interrupt_status : 1;
-//     uint8_t has_remaining_data : 1;
-//     uint8_t transfer_complete : 1;
 //     uint8_t config_mode : 1;
 //     uint8_t tps_remain : 1;
 //   };
 //   uint8_t mask;
 // };
 #define U2HTS_SET_IRQ_STATUS_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 0, x)
-#define U2HTS_SET_DATA_REMAIN_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 1, x)
-#define U2HTS_SET_TRANSFER_DONE_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 2, x)
-#define U2HTS_SET_CONFIG_MODE_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 3, x)
-#define U2HTS_SET_TPS_REMAIN_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 4, x)
+#define U2HTS_SET_CONFIG_MODE_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 1, x)
+#define U2HTS_SET_TPS_REMAIN_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 2, x)
 
 #define U2HTS_GET_IRQ_STATUS_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 0)
-#define U2HTS_GET_DATA_REMAIN_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 1)
-#define U2HTS_GET_TRANSFER_DONE_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 2)
-#define U2HTS_GET_CONFIG_MODE_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 3)
-#define U2HTS_GET_TPS_REMAIN_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 4)
-
-static uint8_t u2hts_status_mask = 0x00;
-static u2hts_hid_report u2hts_report = {0};
-static u2hts_hid_report u2hts_previous_report = {0};
-static uint16_t u2hts_tp_ids_mask = 0;
-
-#ifdef CFG_TUSB_MCU
-
-static const tusb_desc_device_t u2hts_device_desc = {
-    .bLength = sizeof(u2hts_device_desc),
-    .bDescriptorType = TUSB_DESC_DEVICE,
-    .bcdUSB = 0x0200,
-    .bDeviceClass = 0x00,
-    .bDeviceSubClass = 0x00,
-    .bDeviceProtocol = 0x00,
-    .bMaxPacketSize0 = CFG_TUD_ENDPOINT0_SIZE,
-
-    .idVendor = 0x2e8a,   // Raspberry Pi
-    .idProduct = 0x8572,  // UH in ascii
-    .bcdDevice = 0x0100,
-
-    .iManufacturer = 0x01,
-    .iProduct = 0x02,
-    .iSerialNumber = 0x03,
-
-    .bNumConfigurations = 0x01};
-
-static const uint8_t u2hts_hid_desc[] = {
-    HID_USAGE_PAGE(HID_USAGE_PAGE_DIGITIZER), HID_USAGE(0x04),
-    HID_COLLECTION(HID_COLLECTION_APPLICATION),
-    HID_REPORT_ID(U2HTS_HID_TP_REPORT_ID) HID_USAGE(0x22), HID_PHYSICAL_MIN(0),
-    HID_LOGICAL_MIN(0), HID_UNIT_EXPONENT(0x0e), HID_UNIT(0x11),
-    // 10 points
-    U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC,
-    U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC,
-    U2HTS_HID_TP_DESC, U2HTS_HID_TP_DESC, U2HTS_HID_TP_INFO_DESC,
-    HID_REPORT_ID(U2HTS_HID_TP_MAX_COUNT_ID) U2HTS_HID_TP_MAX_COUNT_DESC,
-
-    HID_COLLECTION_END};
-
-static uint16_t _desc_str[32 + 1];
-
-static const uint8_t config_desc[] = {
-    // Config number, interface count, string index, total length, attribute,
-    // power in mA
-    TUD_CONFIG_DESCRIPTOR(1, 1, 0, TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN,
-                          TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
-
-    // Interface number, string index, protocol, report descriptor len, EP In
-    // address, size & polling interval
-    TUD_HID_DESCRIPTOR(0, 0, HID_ITF_PROTOCOL_NONE, sizeof(u2hts_hid_desc),
-                       0x81, CFG_TUD_HID_EP_BUFSIZE, 5)};
-
-static uint8_t const *string_desc_arr[] = {
-    (const char[]){0x09, 0x04},  // 0: is supported language is English (0x0409)
-    "U2HTS",                     // 1: Manufacturer
-    "USB to HID Touchscreen",    // 2: Product
-    NULL,                        // 3: Serials will use unique ID if possible
-};
-
-inline uint8_t const *tud_descriptor_device_cb(void) {
-  return (uint8_t const *)&u2hts_device_desc;
-}
-
-inline uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
-  return (uint8_t const *)u2hts_hid_desc;
-}
-
-inline uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
-  return config_desc;
-}
-
-// Invoked when received GET STRING DESCRIPTOR request
-// Application return pointer to descriptor, whose contents must exist long
-// enough for transfer to complete
-inline uint16_t const *tud_descriptor_string_cb(uint8_t index,
-                                                uint16_t langid) {
-  (void)langid;
-  size_t chr_count;
-
-  switch (index) {
-    case 0:
-      memcpy(&_desc_str[1], string_desc_arr[0], 2);
-      chr_count = 1;
-      break;
-
-    case 3:
-      chr_count = board_usb_get_serial(_desc_str + 1, 32);
-      break;
-
-    default:
-      // Note: the 0xEE index string is a Microsoft OS 1.0 Descriptors.
-      // https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/microsoft-defined-usb-descriptors
-
-      if (!(index < sizeof(string_desc_arr) / sizeof(string_desc_arr[0])))
-        return NULL;
-
-      const char *str = string_desc_arr[index];
-
-      // Cap at max char
-      chr_count = strlen(str);
-      size_t const max_count =
-          sizeof(_desc_str) / sizeof(_desc_str[0]) - 1;  // -1 for string type
-      if (chr_count > max_count) chr_count = max_count;
-
-      // Convert ASCII string into UTF-16
-      for (size_t i = 0; i < chr_count; i++) {
-        _desc_str[1 + i] = str[i];
-      }
-      break;
-  }
-
-  // first byte is length (including header), second byte is string type
-  _desc_str[0] = (uint16_t)((TUSB_DESC_STRING << 8) | (2 * chr_count + 2));
-
-  return _desc_str;
-}
-
-inline void tud_mount_cb(void) { U2HTS_LOG_DEBUG("device mounted"); }
-
-inline void tud_umount_cb(void) { U2HTS_LOG_DEBUG("device unmounted"); }
-
-inline void tud_suspend_cb(bool remote_wakeup_en) {
-  U2HTS_LOG_DEBUG("device suspended, rmt_wakeup_en = %d", remote_wakeup_en);
-}
-
-inline void tud_resume_cb(void) { U2HTS_LOG_DEBUG("device resumed"); }
-
-inline void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
-                                  hid_report_type_t report_type,
-                                  uint8_t const *buffer, uint16_t bufsize) {
-  U2HTS_LOG_DEBUG(
-      "Got hid set report request: instance = %d, report_id = %d, report_type "
-      "= %d, busfize = %d",
-      instance, report_id, report_type, bufsize);
-}
-
-inline uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
-                                      hid_report_type_t report_type,
-                                      uint8_t *buffer, uint16_t reqlen) {
-  U2HTS_LOG_DEBUG(
-      "Got hid get report request: instance = %d, report_id = %d, report_type "
-      "= %d, reqlen = %d",
-      instance, report_id, report_type, reqlen);
-  switch (report_id) {
-    case U2HTS_HID_TP_MAX_COUNT_ID:
-      buffer[0] = config->max_tps;
-      U2HTS_SET_TRANSFER_DONE_FLAG(1);
-      return 1;
-  }
-}
-
-inline void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
-                                       uint16_t len) {
-  if (U2HTS_GET_DATA_REMAIN_FLAG()) {
-    tud_hid_report(
-        0, (void *)((uint32_t)&u2hts_report + CFG_TUD_HID_EP_BUFSIZE - 1),
-        sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE);
-    U2HTS_SET_DATA_REMAIN_FLAG(0);
-  }
-  U2HTS_SET_TRANSFER_DONE_FLAG(
-      (len == sizeof(u2hts_report) + 1 - CFG_TUD_HID_EP_BUFSIZE));
-}
-#endif
-
-inline uint8_t u2hts_get_max_tps() { return config->max_tps; }
+#define U2HTS_GET_CONFIG_MODE_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 1)
+#define U2HTS_GET_TPS_REMAIN_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 2)
 
 inline void u2hts_ts_irq_status_set(bool status) {
   u2hts_ts_irq_set(false);
@@ -244,7 +73,7 @@ void u2hts_i2c_mem_write(uint8_t slave_addr, uint32_t mem_addr,
   }
   memcpy(tx_buf, &mem_addr_be, mem_addr_size);
   memcpy(tx_buf + mem_addr_size, data, data_len);
-  bool ret = u2hts_i2c_write(slave_addr, tx_buf, sizeof(tx_buf));
+  bool ret = u2hts_i2c_write(slave_addr, tx_buf, sizeof(tx_buf), true);
   if (!ret)
     U2HTS_LOG_ERROR("%s error, reg = 0x%x, ret = %d", __func__, mem_addr, ret);
 }
@@ -263,7 +92,7 @@ void u2hts_i2c_mem_read(uint8_t slave_addr, uint32_t mem_addr,
       mem_addr_be = mem_addr;
       break;
   }
-  bool ret = u2hts_i2c_write(slave_addr, &mem_addr_be, mem_addr_size);
+  bool ret = u2hts_i2c_write(slave_addr, &mem_addr_be, mem_addr_size, false);
   if (!ret)
     U2HTS_LOG_ERROR("%s write error, addr = 0x%x, ret = %d", __func__, mem_addr,
                     ret);
@@ -321,6 +150,10 @@ inline static void u2hts_handle_config() {
 }
 
 #endif
+
+inline u2hts_hid_report *u2hts_get_report() { return &u2hts_report; }
+
+inline uint8_t u2hts_get_max_tps() { return config->max_tps; }
 
 inline static uint8_t u2hts_scan_touch_controller() {
   // we assume only 1 i2c slave on the i2c bus
@@ -389,6 +222,7 @@ inline void u2hts_init(u2hts_config *cfg) {
 #endif
   );
   u2hts_list_touch_controller();
+
 #ifdef U2HTS_ENABLE_PERSISTENT_CONFIG
   if (u2hts_config_exists())
     u2hts_load_config(config);
@@ -501,7 +335,6 @@ inline static void u2hts_handle_touch() {
   U2HTS_SET_IRQ_STATUS_FLAG(!config->polling_mode);
   if (tp_count == 0 && u2hts_previous_report.tp_count == 0) return;
 
-  U2HTS_SET_TRANSFER_DONE_FLAG(0);
   u2hts_report.scan_time = u2hts_get_scan_time();
 
   if (u2hts_previous_report.tp_count != u2hts_report.tp_count) {
@@ -532,30 +365,24 @@ inline static void u2hts_handle_touch() {
     U2HTS_LOG_DEBUG(
         "report.tp[%d].contact = %d, report.tp[i].x = %d, "
         "report.tp[i].y = %d, report.tp[i].height = %d, "
-        "report.tp[i].width = %d, report.tp[i].id = %d, ",
+        "report.tp[i].width = %d, report.tp[i].pressure = %d, report.tp[i].id "
+        "= %d",
         i, u2hts_report.tp[i].contact, u2hts_report.tp[i].x,
         u2hts_report.tp[i].y, u2hts_report.tp[i].height,
-        u2hts_report.tp[i].width, u2hts_report.tp[i].id);
+        u2hts_report.tp[i].width, u2hts_report.tp[i].pressure,
+        u2hts_report.tp[i].id);
 
   U2HTS_LOG_DEBUG("report.scan_time = %d, report.tp_count = %d",
                   u2hts_report.scan_time, u2hts_report.tp_count);
-#ifdef CFG_TUSB_MCU
-  U2HTS_SET_DATA_REMAIN_FLAG(
-      u2hts_usb_report(&u2hts_report, U2HTS_HID_TP_REPORT_ID));
-#else
-  u2hts_report.report_id = U2HTS_HID_TP_REPORT_ID;
   u2hts_usb_report(&u2hts_report, U2HTS_HID_TP_REPORT_ID);
-#endif
   u2hts_previous_report = u2hts_report;
   U2HTS_SET_TPS_REMAIN_FLAG((u2hts_previous_report.tp_count > 0));
   u2hts_tps_release_timeout = 0;
 }
 
 inline void u2hts_main() {
-#ifdef CFG_TUSB_MCU
-  tud_task();
-#endif
-
+  u2hts_usb_work();
+  bool u2hts_usb_status = u2hts_get_usb_status();
 #ifdef U2HTS_ENABLE_KEY
   if (U2HTS_GET_CONFIG_MODE_FLAG())
     u2hts_handle_config();
@@ -567,7 +394,7 @@ inline void u2hts_main() {
       if (U2HTS_GET_TPS_REMAIN_FLAG()) {
         // 10 ms
         if (u2hts_tps_release_timeout > U2HTS_TPS_RELEASE_TIMEOUT &&
-            U2HTS_GET_TRANSFER_DONE_FLAG()) {
+            u2hts_usb_status) {
           U2HTS_LOG_DEBUG("releasing remain tps");
           u2hts_handle_touch();
         } else {
@@ -579,16 +406,11 @@ inline void u2hts_main() {
       u2hts_ts_irq_set(!config->polling_mode);
 
 #ifdef U2HTS_ENABLE_LED
-      u2hts_led_set(config->polling_mode ? false
-                                         : !U2HTS_GET_TRANSFER_DONE_FLAG());
-#endif
-
-#ifndef CFG_TUSB_MCU
-      U2HTS_SET_TRANSFER_DONE_FLAG(u2hts_get_usb_status());
+      u2hts_led_set(!u2hts_usb_status);
 #endif
 
       if ((config->polling_mode ? 1 : U2HTS_GET_IRQ_STATUS_FLAG()) &&
-          U2HTS_GET_TRANSFER_DONE_FLAG())
+          u2hts_usb_status)
         u2hts_handle_touch();
 
 #ifdef U2HTS_ENABLE_KEY

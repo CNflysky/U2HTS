@@ -35,14 +35,46 @@
 #define U2HTS_I2C_SCL 11
 #define U2HTS_TP_INT 6
 #define U2HTS_TP_RST 5
-
 #define U2HTS_USR_KEY 9
 // last page
 #define U2HTS_CONFIG_STORAGE_OFFSET PICO_FLASH_SIZE_BYTES - 8192
 
-inline static bool u2hts_i2c_write(uint8_t slave_addr, void *buf, size_t len) {
+#define U2HTS_PHYSICAL_MAX_X 4096
+#define U2HTS_PHYSICAL_MAX_Y 4096
+
+#define U2HTS_HID_TP_DESC                                                     \
+  HID_USAGE(0x22), HID_COLLECTION(HID_COLLECTION_LOGICAL), HID_USAGE(0x42),   \
+      HID_LOGICAL_MAX(1), HID_LOGICAL_MIN(0), HID_REPORT_SIZE(1),             \
+      HID_REPORT_COUNT(1), HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), \
+      HID_USAGE(0x51), HID_REPORT_SIZE(7),                                    \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                      \
+      HID_USAGE_PAGE(HID_USAGE_PAGE_DESKTOP),                                 \
+      HID_LOGICAL_MAX_N(U2HTS_LOGICAL_MAX, 2), HID_REPORT_SIZE(16),           \
+      HID_USAGE(HID_USAGE_DESKTOP_X),                                         \
+      HID_PHYSICAL_MAX_N(U2HTS_PHYSICAL_MAX_X, 2),                            \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                      \
+      HID_PHYSICAL_MAX_N(U2HTS_PHYSICAL_MAX_Y, 2),                            \
+      HID_USAGE(HID_USAGE_DESKTOP_Y),                                         \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),                      \
+      HID_USAGE_PAGE(HID_USAGE_PAGE_DIGITIZER), HID_LOGICAL_MAX_N(255, 2),    \
+      HID_PHYSICAL_MAX_N(255, 2), HID_REPORT_SIZE(8), HID_REPORT_COUNT(3),    \
+      HID_USAGE(0x48), HID_USAGE(0x49), HID_USAGE(0x30),                      \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_COLLECTION_END
+
+#define U2HTS_HID_TP_INFO_DESC                                                \
+  HID_LOGICAL_MAX_N(0xFFFF, 3), HID_REPORT_SIZE(16), HID_UNIT_EXPONENT(0x0C), \
+      HID_UNIT_N(0x1001, 2), HID_REPORT_COUNT(1), HID_USAGE(0x56),            \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE), HID_USAGE(0x54),     \
+      HID_LOGICAL_MAX(10), HID_REPORT_SIZE(8),                                \
+      HID_INPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
+
+#define U2HTS_HID_TP_MAX_COUNT_DESC \
+  HID_USAGE(0x55), HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
+
+inline static bool u2hts_i2c_write(uint8_t slave_addr, void *buf, size_t len,
+                                   bool stop) {
   return (i2c_write_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)buf, len,
-                               false, U2HTS_I2C_TIMEOUT) == len);
+                               !stop, U2HTS_I2C_TIMEOUT) == len);
 }
 
 inline static bool u2hts_i2c_read(uint8_t slave_addr, void *buf, size_t len) {
@@ -93,6 +125,7 @@ inline static void u2hts_delay_ms(uint32_t ms) { sleep_ms(ms); }
 inline static void u2hts_delay_us(uint32_t us) { sleep_us(us); }
 
 inline static bool u2hts_usb_init() { return tud_init(BOARD_TUD_RHPORT); }
+
 inline static uint16_t u2hts_get_scan_time() {
   return (uint16_t)(to_us_since_boot(time_us_64()) / 100);
 }
@@ -124,10 +157,11 @@ inline static uint16_t u2hts_read_config() {
 
 inline static bool u2hts_key_read() { return gpio_get(U2HTS_USR_KEY); }
 
-inline static void u2hts_tpint_set_mode(bool mode) {
+inline static void u2hts_tpint_set_mode(bool mode, bool pull) {
   gpio_deinit(U2HTS_TP_INT);
   gpio_set_function(U2HTS_TP_INT, GPIO_FUNC_SIO);
   gpio_set_dir(U2HTS_TP_INT, mode);
+  pull ? gpio_pull_up(U2HTS_TP_INT) : gpio_pull_down(U2HTS_TP_INT);
 }
 
 inline static bool u2hts_tpint_get() { return gpio_get(U2HTS_TP_INT); }
