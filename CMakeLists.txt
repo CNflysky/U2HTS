@@ -15,9 +15,9 @@ if(WIN32)
 else()
     set(USERHOME $ENV{HOME})
 endif()
-set(sdkVersion 2.1.1)
+set(sdkVersion 2.2.0)
 set(toolchainVersion 14_2_Rel1)
-set(picotoolVersion 2.1.1)
+set(picotoolVersion 2.2.0)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
@@ -36,7 +36,11 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 file(GLOB_RECURSE SOURCES "src/*.c")
-list(REMOVE_ITEM SOURCES ${CMAKE_CURRENT_LIST_DIR}/src/touch-controllers/controller_template.c)
+list(REMOVE_ITEM SOURCES 
+    ${CMAKE_CURRENT_LIST_DIR}/src/touch-controllers/controller_template.c
+    # comment following line to enable dummy driver
+    ${CMAKE_CURRENT_LIST_DIR}/src/touch-controllers/dummy_test.c
+)
 set(SOURCES ${SOURCES} u2hts_main.c)
 
 add_executable(U2HTS ${SOURCES})

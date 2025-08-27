@@ -14,8 +14,9 @@
 int main() {
   stdio_init_all();
   u2hts_pins_init();
-  // make these configs can change using
-  // `picotool config -s <cfg> <val> U2HTS.uf2`
+  // Export config to picotool.
+  // Change with `picotool config -s <cfg> <val> U2HTS.uf2`
+  // E.g. `picotool config -s x_max 1920 U2HTS.uf2`
   bi_decl(bi_program_feature_group(
       U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID, "Touchscreen config"));
   // controller name
@@ -31,9 +32,7 @@ int main() {
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
                        x_y_swap, false));
 
-  // The following configs are optional. If not set (0), u2hts_init() will
-  // read touch controller's config to determine these values.
-  // max touchpoints
+  // The following configs are optional.
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
                        max_tps, 0));
   // max X coordinate
@@ -42,8 +41,7 @@ int main() {
   // max Y coordinate
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID, y_max,
                        0));
-  // controller i2c address, if empty then default slave address defined in each
-  // driver will be used
+  // controller i2c address
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
                        i2c_addr, 0x00));
   // IRQ flag
@@ -65,5 +63,8 @@ int main() {
                       .irq_flag = irq_flag,
                       .polling_mode = polling_mode};
   u2hts_init(&cfg);
-  while (1) u2hts_main();
+  while (1) {
+    tud_task();
+    u2hts_main();
+  }
 }

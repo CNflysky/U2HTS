@@ -81,7 +81,7 @@ extern "C" {
 #endif
 
 #ifndef CFG_TUSB_MEM_ALIGN
-#define CFG_TUSB_MEM_ALIGN __attribute__((aligned(4)))
+#define CFG_TUSB_MEM_ALIGN __aligned(4)
 #endif
 
 //--------------------------------------------------------------------
@@ -100,7 +100,7 @@ extern "C" {
 #define CFG_TUD_VENDOR 0
 
 // HID buffer size Should be sufficient to hold ID (if any) + Data
-#define CFG_TUD_HID_EP_BUFSIZE 64
+#define CFG_TUD_HID_EP_BUFSIZE 300 /* MS THQA cert require 256 bytes + 1 byte ID */
 
 #ifdef __cplusplus
 }

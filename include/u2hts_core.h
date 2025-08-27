@@ -86,6 +86,7 @@
 
 #define U2HTS_HID_TP_REPORT_ID 1
 #define U2HTS_HID_TP_MAX_COUNT_ID 2
+#define U2HTS_HID_TP_MS_THQA_CERT_ID 3
 
 #define U2HTS_TOUCH_CONTROLLER(controller)                                  \
   __attribute__((                                                           \

@@ -71,6 +71,11 @@
 #define U2HTS_HID_TP_MAX_COUNT_DESC \
   HID_USAGE(0x55), HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
 
+#define U2HTS_HID_TP_MS_THQA_CERT_DESC                                     \
+  HID_USAGE_PAGE_N(0XFF00, 2), HID_USAGE(0xc5), HID_LOGICAL_MAX_N(255, 2), \
+      HID_REPORT_COUNT_N(256, 2),                                          \
+      HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
+
 inline static bool u2hts_i2c_write(uint8_t slave_addr, void *buf, size_t len,
                                    bool stop) {
   return (i2c_write_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)buf, len,
@@ -88,7 +93,7 @@ inline static void u2hts_pins_init() {
   gpio_pull_up(U2HTS_I2C_SDA);
   gpio_pull_up(U2HTS_I2C_SCL);
 
-  i2c_init(U2HTS_I2C, 100 * 1000);  // 100 KHz
+  i2c_init(U2HTS_I2C, 400 * 1000);  // 400 KHz
 
   // some touch contoller requires ATTN signal in specified state while
   // resetting.
@@ -165,7 +170,5 @@ inline static void u2hts_tpint_set_mode(bool mode, bool pull) {
 }
 
 inline static bool u2hts_tpint_get() { return gpio_get(U2HTS_TP_INT); }
-
-void u2hts_rp2040_irq_cb(uint gpio, uint32_t event_mask);
 
 #endif

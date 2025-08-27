@@ -32,6 +32,4 @@ uint16_t u2hts_read_config();
 bool u2hts_key_read();
 // true = okay false = busy
 bool u2hts_get_usb_status();
-// some usb lib have a usb handler that need to be called repeatly, e.g. TinyUSB
-void u2hts_usb_work();
 #endif

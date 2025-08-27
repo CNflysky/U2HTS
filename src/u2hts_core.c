@@ -148,19 +148,9 @@ inline static void u2hts_handle_config() {
 #endif
   U2HTS_SET_CONFIG_MODE_FLAG(0);
 }
-
 #endif
 
-inline u2hts_hid_report *u2hts_get_report() { return &u2hts_report; }
-
 inline uint8_t u2hts_get_max_tps() { return config->max_tps; }
-
-inline static uint8_t u2hts_scan_touch_controller() {
-  // we assume only 1 i2c slave on the i2c bus
-  for (uint8_t i = 0x00; i < 0x7F; i++)
-    if (u2hts_i2c_detect_slave(i)) return i;
-  return 0;
-}
 
 inline static u2hts_touch_controller *u2hts_get_touch_controller_by_name(
     const char *name) {
@@ -186,6 +176,35 @@ inline static void u2hts_list_touch_controller() {
     printf(" %s", (*tc)->name);
   printf("\n");
 #endif
+}
+
+inline static u2hts_touch_controller *u2hts_scan_touch_controller() {
+  uint8_t slave_addr = 0x00;
+  // we assume only 1 i2c slave on the i2c bus
+  for (uint8_t i = 0x00; i < 0x7F; i++)
+    if (u2hts_i2c_detect_slave(i)) {
+      slave_addr = i;
+      break;
+    }
+
+  if (!slave_addr) {
+    U2HTS_LOG_ERROR("No controller was found on i2c bus");
+    return NULL;
+  }
+
+  u2hts_touch_controller *tc = u2hts_get_touch_controller_by_addr(slave_addr);
+  if (!tc) {
+    U2HTS_LOG_ERROR(
+        "No touch controller with i2c addr 0x%x compatible was found",
+        slave_addr);
+    return NULL;
+  }
+
+  U2HTS_LOG_INFO("Found controller %s @ addr 0x%x", tc->name, slave_addr);
+  U2HTS_LOG_INFO(
+      "If controller mismatched, try specify controller name in config");
+
+  return tc;
 }
 
 void u2hts_apply_config_to_tp(const u2hts_config *cfg, u2hts_tp *tp) {
@@ -230,35 +249,13 @@ inline void u2hts_init(u2hts_config *cfg) {
     u2hts_save_config(config);
 #endif
 
-  if (!strcmp(config->controller, "auto")) {
-    uint8_t addr = 0x00;
-    if (config->i2c_addr) {
-      U2HTS_LOG_INFO("Matching touch controller with addr 0x%x",
-                     config->i2c_addr);
-      addr = config->i2c_addr;
-    } else {
-      U2HTS_LOG_INFO("Scanning for i2c devices...");
-      addr = u2hts_scan_touch_controller();
-    }
-    if (addr == 0x00)
-      U2HTS_LOG_ERROR("No controller was found on i2c bus");
-    else {
-      touch_controller = u2hts_get_touch_controller_by_addr(addr);
-      if (!touch_controller)
-        U2HTS_LOG_ERROR(
-            "No touch controller with i2c addr 0x%x compatible was found",
-            addr);
-      else {
-        U2HTS_LOG_INFO("Found controller %s @ addr 0x%x",
-                       touch_controller->name, addr);
-        U2HTS_LOG_INFO(
-            "If controller mismatched, try specify controller name in config");
-      }
-    }
-  } else {
+  if (!strcmp(config->controller, "auto")) 
+    touch_controller = u2hts_scan_touch_controller();
+   else {
     U2HTS_LOG_INFO("Controller: %s", cfg->controller);
     touch_controller = u2hts_get_touch_controller_by_name(cfg->controller);
   }
+
   if (!touch_controller) {
     U2HTS_LOG_ERROR("Failed to get touch controller");
     while (1)
@@ -305,11 +302,11 @@ inline void u2hts_init(u2hts_config *cfg) {
       U2HTS_LOG_ERROR(
           "Controller does not support auto configuration, but x/y coords or "
           "max_tps are not configured");
-      while (1) {
+      while (1)
 #ifdef U2HTS_ENABLE_LED
         U2HTS_LED_DISPLAY_PATTERN(ultrashort_flash, 1);
 #endif
-      };
+      ;
     }
   }
 
@@ -327,7 +324,6 @@ inline void u2hts_init(u2hts_config *cfg) {
 inline static void u2hts_handle_touch() {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   memset(&u2hts_report, 0x00, sizeof(u2hts_report));
-  for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].id = 0x7F;
   touch_controller->operations->fetch(config, &u2hts_report);
 
   uint8_t tp_count = u2hts_report.tp_count;
@@ -365,7 +361,8 @@ inline static void u2hts_handle_touch() {
     U2HTS_LOG_DEBUG(
         "report.tp[%d].contact = %d, report.tp[i].x = %d, "
         "report.tp[i].y = %d, report.tp[i].height = %d, "
-        "report.tp[i].width = %d, report.tp[i].pressure = %d, report.tp[i].id "
+        "report.tp[i].width = %d, report.tp[i].pressure = %d, "
+        "report.tp[i].id "
         "= %d",
         i, u2hts_report.tp[i].contact, u2hts_report.tp[i].x,
         u2hts_report.tp[i].y, u2hts_report.tp[i].height,
@@ -381,8 +378,6 @@ inline static void u2hts_handle_touch() {
 }
 
 inline void u2hts_main() {
-  u2hts_usb_work();
-  bool u2hts_usb_status = u2hts_get_usb_status();
 #ifdef U2HTS_ENABLE_KEY
   if (U2HTS_GET_CONFIG_MODE_FLAG())
     u2hts_handle_config();
@@ -394,7 +389,7 @@ inline void u2hts_main() {
       if (U2HTS_GET_TPS_REMAIN_FLAG()) {
         // 10 ms
         if (u2hts_tps_release_timeout > U2HTS_TPS_RELEASE_TIMEOUT &&
-            u2hts_usb_status) {
+            u2hts_get_usb_status()) {
           U2HTS_LOG_DEBUG("releasing remain tps");
           u2hts_handle_touch();
         } else {
@@ -406,11 +401,11 @@ inline void u2hts_main() {
       u2hts_ts_irq_set(!config->polling_mode);
 
 #ifdef U2HTS_ENABLE_LED
-      u2hts_led_set(!u2hts_usb_status);
+      u2hts_led_set(!u2hts_get_usb_status());
 #endif
 
       if ((config->polling_mode ? 1 : U2HTS_GET_IRQ_STATUS_FLAG()) &&
-          u2hts_usb_status)
+          u2hts_get_usb_status())
         u2hts_handle_touch();
 
 #ifdef U2HTS_ENABLE_KEY
