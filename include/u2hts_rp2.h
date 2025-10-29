@@ -5,8 +5,8 @@
   All rights reserved.
 */
 
-#ifndef _U2HTS_RP2040_H_
-#define _U2HTS_RP2040_H_
+#ifndef _U2HTS_RP2_H_
+#define _U2HTS_RP2_H_
 
 #include "bsp/board_api.h"
 #include "hardware/flash.h"
@@ -87,6 +87,25 @@ inline static bool u2hts_i2c_read(uint8_t slave_addr, void *buf, size_t len) {
                               U2HTS_I2C_TIMEOUT) == len);
 }
 
+// RP2 i2c hardware does not have a bus reset feature, so bitbang it.
+inline static void rp2_i2c_reset() {
+  gpio_put(U2HTS_I2C_SDA, true);
+  gpio_put(U2HTS_I2C_SCL, true);
+  sleep_us(5);
+
+  for (uint8_t i = 0; i < 9; i++) {
+    gpio_put(U2HTS_I2C_SCL, false);
+    sleep_us(5);
+    gpio_put(U2HTS_I2C_SCL, true);
+    sleep_us(5);
+  }
+
+  gpio_put(U2HTS_I2C_SDA, false);
+  gpio_put(U2HTS_I2C_SCL, true);
+  sleep_us(5);
+  gpio_put(U2HTS_I2C_SDA, true);
+}
+
 inline static void u2hts_pins_init() {
   gpio_set_function(U2HTS_I2C_SCL, GPIO_FUNC_I2C);
   gpio_set_function(U2HTS_I2C_SDA, GPIO_FUNC_I2C);
@@ -94,7 +113,6 @@ inline static void u2hts_pins_init() {
   gpio_pull_up(U2HTS_I2C_SCL);
 
   i2c_init(U2HTS_I2C, 400 * 1000);  // 400 KHz
-
   // some touch contoller requires ATTN signal in specified state while
   // resetting.
   gpio_set_function(U2HTS_TP_INT, GPIO_FUNC_SIO);
@@ -117,6 +135,7 @@ inline static void u2hts_tpint_set(bool value) {
 }
 
 inline static bool u2hts_i2c_detect_slave(uint8_t addr) {
+  rp2_i2c_reset();
   uint8_t rx = 0;
   return i2c_read_timeout_us(U2HTS_I2C, addr, &rx, sizeof(rx), false,
                              U2HTS_I2C_TIMEOUT) >= 0;
@@ -139,12 +158,12 @@ inline static void u2hts_led_set(bool on) {
   gpio_put(PICO_DEFAULT_LED_PIN, on);
 }
 
-inline static void u2hts_rp2040_flash_erase(void *param) {
+inline static void u2hts_rp2_flash_erase(void *param) {
   (void)param;
   flash_range_erase(U2HTS_CONFIG_STORAGE_OFFSET, FLASH_SECTOR_SIZE);
 }
 
-inline static void u2hts_rp2040_flash_write(void *param) {
+inline static void u2hts_rp2_flash_write(void *param) {
   uint8_t flash_program_buf[FLASH_PAGE_SIZE] = {0};
   flash_program_buf[0] = *(uintptr_t *)param;
   flash_range_program(U2HTS_CONFIG_STORAGE_OFFSET, flash_program_buf,
@@ -152,8 +171,8 @@ inline static void u2hts_rp2040_flash_write(void *param) {
 }
 
 inline static void u2hts_write_config(uint16_t cfg) {
-  flash_safe_execute(u2hts_rp2040_flash_erase, NULL, 0xFFFF);
-  flash_safe_execute(u2hts_rp2040_flash_write, &cfg, 0xFFFF);
+  flash_safe_execute(u2hts_rp2_flash_erase, NULL, 0xFFFF);
+  flash_safe_execute(u2hts_rp2_flash_write, &cfg, 0xFFFF);
 }
 
 inline static uint16_t u2hts_read_config() {

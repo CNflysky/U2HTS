@@ -62,7 +62,13 @@ int main() {
                       .y_max = y_max,
                       .irq_flag = irq_flag,
                       .polling_mode = polling_mode};
-  u2hts_init(&cfg);
+  int8_t ret = u2hts_init(&cfg);
+  if (ret < 0)
+#ifdef U2HTS_ENABLE_LED
+    u2hts_led_show_error_code(ret);
+#else
+    while (1);
+#endif
   while (1) {
     tud_task();
     u2hts_main();

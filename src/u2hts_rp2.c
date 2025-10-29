@@ -43,7 +43,8 @@ static const uint8_t u2hts_hid_report_desc[] = {
 
     HID_COLLECTION_END};
 
-// see https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchscreen-required-hid-top-level-collections
+// see
+// https://learn.microsoft.com/en-us/windows-hardware/design/component-guidelines/touchscreen-required-hid-top-level-collections
 // "Device Certification Status Feature Report" section
 static const uint8_t u2hts_ms_thqa_cert[256] = {
     0xfc, 0x28, 0xfe, 0x84, 0x40, 0xcb, 0x9a, 0x87, 0x0d, 0xbe, 0x57, 0x3c,
@@ -199,7 +200,7 @@ inline void u2hts_ts_irq_set(bool enable) {
   gpio_set_irq_enabled(U2HTS_TP_INT, real_irq_flag, enable);
 }
 
-inline static void u2hts_rp2040_irq_cb(uint gpio, uint32_t event_mask) {
+inline static void u2hts_rp2_irq_cb(uint gpio, uint32_t event_mask) {
   u2hts_ts_irq_status_set(gpio == U2HTS_TP_INT && (event_mask & real_irq_flag));
 }
 
@@ -225,7 +226,7 @@ inline void u2hts_ts_irq_setup(uint8_t irq_flag) {
       break;
   }
   gpio_set_irq_enabled_with_callback(U2HTS_TP_INT, real_irq_flag, true,
-                                     u2hts_rp2040_irq_cb);
+                                     u2hts_rp2_irq_cb);
 }
 
 inline void u2hts_usb_report(void *report, uint8_t report_id) {

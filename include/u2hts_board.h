@@ -8,7 +8,7 @@
 #ifndef _U2HTS_BOARD_H_
 #define _U2HTS_BOARD_H_
 // target platform
-#include "u2hts_rp2040.h"
+#include "u2hts_rp2.h"
 
 bool u2hts_i2c_write(uint8_t slave_addr, void *buf, size_t len, bool stop);
 bool u2hts_i2c_read(uint8_t slave_addr, void *buf, size_t len);

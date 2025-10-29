@@ -77,5 +77,12 @@ target_link_libraries(U2HTS
 
 target_compile_options(U2HTS PRIVATE -Wunused)
 
-pico_set_linker_script(U2HTS ${CMAKE_CURRENT_LIST_DIR}/memmap_u2hts.ld)
+if(PICO_PLATFORM MATCHES "rp2350")
+    pico_set_linker_script(U2HTS ${CMAKE_CURRENT_LIST_DIR}/memmap_rp2350.ld)
+elseif(PICO_PLATFORM MATCHES "rp2040")
+    pico_set_linker_script(U2HTS ${CMAKE_CURRENT_LIST_DIR}/memmap_rp2040.ld)
+else()
+    message(Unknown platform: ${PICO_PLATFORM})
+endif()
+
 pico_add_extra_outputs(U2HTS)

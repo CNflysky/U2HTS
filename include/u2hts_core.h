@@ -95,6 +95,13 @@
           ".u2hts_touch_controllers"))) static const u2hts_touch_controller \
       *u2hts_touch_controller_##controller = &controller
 
+typedef enum {
+  UE_NSLAVE = 1,  // no slave detected on i2c bus
+  UE_NCOMPAT,     // no compatible controller found
+  UE_NCONF,       // required parameters not configured
+  UE_FSETUP       // failed to setup controller
+} U2HTS_ERROR_CODES;
+
 typedef struct __packed {
   bool contact : 1;
   uint8_t id : 7;
@@ -144,7 +151,7 @@ typedef struct {
   u2hts_touch_controller_operations *operations;
 } u2hts_touch_controller;
 
-void u2hts_init(u2hts_config *cfg);
+int8_t u2hts_init(u2hts_config *cfg);
 void u2hts_main();
 uint8_t u2hts_get_max_tps();
 void u2hts_i2c_mem_write(uint8_t slave_addr, uint32_t mem_addr,
@@ -154,7 +161,6 @@ void u2hts_i2c_mem_read(uint8_t slave_addr, uint32_t mem_addr,
 void u2hts_ts_irq_status_set(bool status);
 
 void u2hts_apply_config_to_tp(const u2hts_config *cfg, u2hts_tp *tp);
-u2hts_hid_report *u2hts_get_report();
 
 #ifdef U2HTS_ENABLE_LED
 typedef struct {
@@ -175,6 +181,7 @@ inline static void u2hts_led_display_pattern(u2hts_led_pattern *pattern,
     u2hts_delay_ms(pattern[i].delay_ms);
   }
 }
+void u2hts_led_show_error_code(int16_t code);
 #endif
 
 inline static void u2hts_apply_config(u2hts_config *cfg, uint16_t config_mask) {

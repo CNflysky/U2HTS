@@ -1,6 +1,6 @@
 # U2HTS
-USB HID multitouch touchscreen based on RP2040.  
-`U2HTS` stands for **U**SB to **H**ID **T**ouch**S**creen.  
+USB HID multitouch touchscreen based on Raspberry Pi RP2 MCUs.  
+`U2HTS` stands for **U**SB **2** **H**ID **T**ouch**S**creen.  
 [zh_CN(简体中文)](./README_zh.md)
 
 # Features
@@ -24,47 +24,46 @@ See [U2HTS touch controllers](https://github.com/CNflysky/u2hts_touch_controller
 | 4 | N | Y | Y |
 
 # LED pattern decode
-**long flash**: interval 1s  
-**short flash**: interval 250ms  
-**ultrashort flash**: interval 150ms  
+**long blink**: interval 1s  
+**short blink**: interval 250ms  
+**ultrashort blink**: interval 150ms  
 
-## Running Mode
-*ultrashort flash twice*: `u2hts_get_touch_controller()` success  
-*long flash loop*: `u2hts_get_touch_controller()` fail  
-*short flash loop*: failed to initialise touch controller  
+## Normal Mode
+*long blink loop*: no slave detected on I2C bus / no compatible controller found  
+*short blink loop*: failed to initialise touch controller  
+*ultrashort blink loop*: required touch controller parameters unconfigured    
 
 ## Config mode
 *always on*: Entered config mode  
-*ultrashort flash `n` times*: switching to `n`th config  
+*ultrashort blink `n` times*: switching to `n`th config  
 
 # Key
 *Enter config mode*: long press (>1 sec)  
-*Switch config*: short press  
+*Rotate config*: short click  
 
-System will save config if no operation performed in a specified delay.  
+After a idle time (~5s) system will apply new config (and save to flash if `U2HTS_ENABLE_PERSISTENT_CONFIG` enabled).
 
 # Ports
 | MCU | Key | Persistent config | LED | 
 | --- | --- | --- | --- |
-| RP2040 | Y | N | Y |
+| RP2040/RP2350 | Y | N | Y |
 | [STM32F070F6](https://github.com/CNflysky/U2HTS_F070F6) | Y | Y | Y |
 | CH32X033F8 | Y | Y | Y |
 
-# RP Circuit
-`u2hts_rp2040.h`: 
+# RP2 Circuit
+`u2hts_rp2.h`: 
 ```c
 #define U2HTS_I2C_SDA 10
 #define U2HTS_I2C_SCL 11
 #define U2HTS_TP_INT 6
 #define U2HTS_TP_RST 5
 ```
-No external pull-up/pull-down resistors required.  
+No external pull-up/pull-down resistors are required.  
 
-# RP Build
+# RP2 Build
 Install `VS code` and `Raspberry Pi Pico` plugin, import this repository, then build.
-
-# RP Config
-You can config touchscreen via `picotool` without rebuild firmware on RP series platforms.
+`# RP2 Config
+You can config touchscreen via `picotool` without rebuild firmware on RP2 platform.
 | Config | Name | Value |
 | --- | --- | --- |
 | Controller name | `controller` | refer `Touch controllers` section |
@@ -73,14 +72,14 @@ You can config touchscreen via `picotool` without rebuild firmware on RP series 
 | Swap X&Y axis | `x_y_swap` | 0/1 |
 | Polling mode | `polling_mode` | 0/1 |
 | I2C slave address | `i2c_addr` | 7-bit device address |
-
-You must configure these value when using an controller that does NOT support auto-config:
+| Interrupt flag | `irq_flag` | (1/2/3/4, refer `u2hts_core.h`) |
+ 
+These values must be configured when using an controller that does NOT support auto-config:
 | Config | Name | Value |
 | --- | --- | --- |
 | Max touch points | `max_tps` | up to 10 |
 | X axis max | `x_max` | 65535 |
 | Y axis max | `y_max` | 65535 |
-| Interrupt flag | `irq_flag` | (1/2/3/4, refer `u2hts_core.h`) |
 
 Example：
 ```bash
