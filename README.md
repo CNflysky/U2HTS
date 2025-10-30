@@ -46,7 +46,7 @@ After a idle time (~5s) system will apply new config (and save to flash if `U2HT
 # Ports
 | MCU | Key | Persistent config | LED | 
 | --- | --- | --- | --- |
-| RP2040/RP2350 | Y | N | Y |
+| RP2040/RP2350 | Y | Y | Y |
 | [STM32F070F6](https://github.com/CNflysky/U2HTS_F070F6) | Y | Y | Y |
 | CH32X033F8 | Y | Y | Y |
 

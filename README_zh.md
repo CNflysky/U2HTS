@@ -48,7 +48,7 @@
 | CH32X033F8 | Y | Y | Y |
 
 # RP系列电路
-`u2hts_rp2040.h`: 
+`u2hts_rp2.h`: 
 ```c
 #define U2HTS_I2C_SDA 10
 #define U2HTS_I2C_SCL 11

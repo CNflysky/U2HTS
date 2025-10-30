@@ -193,7 +193,7 @@ inline static void u2hts_list_touch_controller() {
 #endif
 }
 
-inline static u2hts_touch_controller* u2hts_scan_touch_controller(int8_t* ret) {
+inline static int8_t u2hts_scan_touch_controller(u2hts_touch_controller* tc) {
   uint8_t slave_addr = 0x00;
   // we assume only 1 i2c slave on the i2c bus
   U2HTS_LOG_INFO("Scanning i2c slaves...");
@@ -205,24 +205,22 @@ inline static u2hts_touch_controller* u2hts_scan_touch_controller(int8_t* ret) {
 
   if (!slave_addr) {
     U2HTS_LOG_ERROR("No controller was found on i2c bus");
-    *ret = -UE_NSLAVE;
-    return NULL;
+    return -UE_NSLAVE;
   }
 
-  u2hts_touch_controller* tc = u2hts_get_touch_controller_by_addr(slave_addr);
+  tc = u2hts_get_touch_controller_by_addr(slave_addr);
   if (!tc) {
     U2HTS_LOG_ERROR(
         "No touch controller with i2c addr 0x%x compatible was found",
         slave_addr);
-    *ret = -UE_NCOMPAT;
-    return NULL;
+    return -UE_NCOMPAT;
   }
 
   U2HTS_LOG_INFO("Found controller %s @ addr 0x%x", tc->name, slave_addr);
   U2HTS_LOG_INFO(
       "If controller mismatched, try specify controller name in config");
 
-  return tc;
+  return 0;
 }
 
 void u2hts_apply_config_to_tp(const u2hts_config* cfg, u2hts_tp* tp) {
@@ -267,15 +265,15 @@ inline int8_t u2hts_init(u2hts_config* cfg) {
   else
     u2hts_save_config(config);
 #endif
-
   if (!strcmp(config->controller, "auto"))
-    touch_controller = u2hts_scan_touch_controller(&ret);
+    ret = u2hts_scan_touch_controller(touch_controller);
   else {
     U2HTS_LOG_INFO("Controller: %s", cfg->controller);
     touch_controller = u2hts_get_touch_controller_by_name(cfg->controller);
+    if (!touch_controller) ret = -UE_NCOMPAT;
   }
 
-  if (!touch_controller) {
+  if (ret < 0) {
     U2HTS_LOG_ERROR("Failed to get touch controller");
     return ret;
   }
