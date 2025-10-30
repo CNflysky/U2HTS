@@ -62,7 +62,8 @@ No external pull-up/pull-down resistors are required.
 
 # RP2 Build
 Install `VS code` and `Raspberry Pi Pico` plugin, import this repository, then build.
-`# RP2 Config
+
+# RP2 Config
 You can config touchscreen via `picotool` without rebuild firmware on RP2 platform.
 | Config | Name | Value |
 | --- | --- | --- |
