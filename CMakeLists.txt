@@ -33,17 +33,22 @@ project(U2HTS C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
-# Add executable. Default name is the project name, version 0.1
-
-file(GLOB_RECURSE SOURCES "src/*.c")
-list(REMOVE_ITEM SOURCES 
-    ${CMAKE_CURRENT_LIST_DIR}/src/touch-controllers/controller_template.c
-    # comment following line to enable dummy driver
-    ${CMAKE_CURRENT_LIST_DIR}/src/touch-controllers/dummy_test.c
+set(TOUCH_CONTROLLERS
+    ${CMAKE_CURRENT_LIST_DIR}/src/touch-controllers/gt9xx.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/touch-controllers/ft54x6.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/touch-controllers/rmi_common.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/touch-controllers/rmi_f11.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/touch-controllers/cst8xx.c
 )
-set(SOURCES ${SOURCES} u2hts_main.c)
 
-add_executable(U2HTS ${SOURCES})
+set(SOURCES 
+    ${CMAKE_CURRENT_LIST_DIR}/src/u2hts_core.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/u2hts_rp2.c
+    ${CMAKE_CURRENT_LIST_DIR}/u2hts_main.c
+)
+
+# Add executable. Default name is the project name, version 0.1
+add_executable(U2HTS ${SOURCES} ${TOUCH_CONTROLLERS})
 
 pico_set_program_name(U2HTS "U2HTS")
 pico_set_program_version(U2HTS "0.1")
