@@ -2,3 +2,4 @@ build
 .vscode
 board
 p_*.c
+.DS_Store

@@ -70,6 +70,7 @@ RP系列支持通过`Picotool`工具来修改触摸屏相关设置，不需要�
 | 交换XY轴 | `x_y_swap` | 0/1 |
 | 轮询模式 | `polling_mode` | 0/1 |
 | I2C从机地址 | `i2c_addr` | 7位地址 |
+| 坐标获取延时 | `fetch_delay` | uint32_t, 默认为0 |
 | 中断标志 | `irq_flag` | (1/2/3/4, 参考`u2hts_core.h`) |
 
 如果控制器不支持自动配置，则必须配置以下参数：

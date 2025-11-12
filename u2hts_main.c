@@ -47,6 +47,9 @@ int main() {
   // IRQ flag
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
                        irq_flag, 0));
+  // Delay between coordinate acquisitions
+  bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
+                       fetch_delay, 0));
 
   // Polling mode
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,

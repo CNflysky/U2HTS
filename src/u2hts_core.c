@@ -224,6 +224,8 @@ inline static int8_t u2hts_scan_touch_controller(u2hts_touch_controller** tc) {
 }
 
 void u2hts_apply_config_to_tp(const u2hts_config* cfg, u2hts_tp* tp) {
+  U2HTS_LOG_DEBUG("raw data: id = %d, x = %d, y = %d, contact = %d", tp->id,
+                  tp->x, tp->y, tp->contact);
   tp->x = (tp->x > cfg->x_max) ? cfg->x_max : tp->x;
   tp->y = (tp->y > cfg->y_max) ? cfg->y_max : tp->y;
   tp->x = U2HTS_MAP_VALUE(tp->x, cfg->x_max, U2HTS_LOGICAL_MAX);
@@ -327,7 +329,8 @@ inline static void u2hts_handle_touch() {
   memset(&u2hts_report, 0x00, sizeof(u2hts_report));
   for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].id = 0x7F;
   touch_controller->operations->fetch(config, &u2hts_report);
-
+  u2hts_delay_ms(config->fetch_delay);
+  
   uint8_t tp_count = u2hts_report.tp_count;
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
   U2HTS_SET_IRQ_STATUS_FLAG(!config->polling_mode);

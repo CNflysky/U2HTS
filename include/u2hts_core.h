@@ -134,6 +134,7 @@ typedef struct {
   uint16_t y_max;
   uint8_t max_tps;
   uint8_t irq_flag;
+  uint32_t fetch_delay;
   bool polling_mode;
 } u2hts_config;
 

@@ -73,6 +73,7 @@ You can config touchscreen via `picotool` without rebuild firmware on RP2 platfo
 | Swap X&Y axis | `x_y_swap` | 0/1 |
 | Polling mode | `polling_mode` | 0/1 |
 | I2C slave address | `i2c_addr` | 7-bit device address |
+| coordinates fetch delay | `fetch_delay` | uint32_t, default 0 |
 | Interrupt flag | `irq_flag` | (1/2/3/4, refer `u2hts_core.h`) |
  
 These values must be configured when using an controller that does NOT support auto-config:
