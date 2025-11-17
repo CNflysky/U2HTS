@@ -129,7 +129,7 @@ SECTIONS
         . = ALIGN(4);
     } > FLASH
 
-    .u2hts_touch_controllers : {
+    .u2hts_touch_controllers (READONLY) : {
         __u2hts_touch_controllers_begin = .;
         KEEP(*(SORT(.u2hts_touch_controllers*)))
         . = ALIGN(4);

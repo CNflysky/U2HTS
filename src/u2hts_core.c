@@ -20,7 +20,7 @@ static uint16_t u2hts_tp_ids_mask = 0;
 // x_invert, y_invert
 // x_y_swap, x_invert
 // x_y_swap, y_invert
-static uint16_t u2hts_config_masks[] = {0x0, 0x620, 0x320, 0x520};
+static __unused uint16_t u2hts_config_masks[] = {0x0, 0x620, 0x320, 0x520};
 
 #ifdef U2HTS_ENABLE_LED
 static u2hts_led_pattern long_flash[] = {{.state = true, .delay_ms = 1000},
