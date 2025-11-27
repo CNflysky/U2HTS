@@ -24,7 +24,7 @@ See [U2HTS touch controllers](https://github.com/CNflysky/u2hts_touch_controller
 | 4 | N | Y | Y |
 
 # LED pattern decode
-If the LED blinks in a looping pattern and the host does not recognise the device, that means a error.   
+If the LED blinks in a looping pattern and the host does not recognize the device, that means a error.   
 | Blink count | Error |
 | --- | --- |
 | 1 | No slave detected on I2C bus |
