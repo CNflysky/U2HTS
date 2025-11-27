@@ -65,8 +65,8 @@ int main() {
                       .y_max = y_max,
                       .irq_flag = irq_flag,
                       .polling_mode = polling_mode};
-  int8_t ret = u2hts_init(&cfg);
-  if (ret < 0)
+  U2HTS_ERROR_CODES ret = u2hts_init(&cfg);
+  if (ret) 
 #ifdef U2HTS_ENABLE_LED
     u2hts_led_show_error_code(ret);
 #else

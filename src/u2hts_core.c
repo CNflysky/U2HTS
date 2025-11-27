@@ -53,7 +53,7 @@ static inline void u2hts_led_flash(uint16_t times) {
 
 inline void u2hts_led_show_error_code(U2HTS_ERROR_CODES code) {
   while (1) {
-    u2hts_led_flash(abs(code));
+    u2hts_led_flash(code);
     u2hts_delay_ms(1000);
   }
 }
@@ -223,7 +223,8 @@ inline static u2hts_touch_controller* u2hts_get_touch_controller_by_addr(
   return NULL;
 }
 
-inline static int8_t u2hts_scan_touch_controller(u2hts_touch_controller** tc) {
+inline static U2HTS_ERROR_CODES u2hts_scan_touch_controller(
+    u2hts_touch_controller** tc) {
   uint8_t slave_addr = 0x00;
   // we assume only 1 i2c slave on the i2c bus
   U2HTS_LOG_INFO("Scanning i2c slaves...");
@@ -235,7 +236,7 @@ inline static int8_t u2hts_scan_touch_controller(u2hts_touch_controller** tc) {
 
   if (!slave_addr) {
     U2HTS_LOG_ERROR("No controller was found on i2c bus");
-    return -UE_NSLAVE;
+    return UE_NSLAVE;
   }
 
   *tc = u2hts_get_touch_controller_by_addr(slave_addr);
@@ -243,20 +244,20 @@ inline static int8_t u2hts_scan_touch_controller(u2hts_touch_controller** tc) {
     U2HTS_LOG_ERROR(
         "No touch controller with i2c addr 0x%x compatible was found",
         slave_addr);
-    return -UE_NCOMPAT;
+    return UE_NCOMPAT;
   }
 
   U2HTS_LOG_INFO("Found controller %s @ addr 0x%x", (*tc)->name, slave_addr);
   U2HTS_LOG_INFO(
       "If controller mismatched, try specify controller name in config");
-  return 0;
+  return UE_OK;
 }
 
 inline uint8_t u2hts_get_max_tps() { return config->max_tps; }
 
-inline int8_t u2hts_init(u2hts_config* cfg) {
+inline U2HTS_ERROR_CODES u2hts_init(u2hts_config* cfg) {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
-  int8_t ret = 0;
+  U2HTS_ERROR_CODES ret = UE_OK;
   config = cfg;
   U2HTS_LOG_INFO("U2HTS firmware built @ %s %s with feature%s", __DATE__,
                  __TIME__,
@@ -284,10 +285,10 @@ inline int8_t u2hts_init(u2hts_config* cfg) {
   else {
     U2HTS_LOG_INFO("Controller: %s", cfg->controller);
     touch_controller = u2hts_get_touch_controller_by_name(cfg->controller);
-    if (!touch_controller) ret = -UE_NCOMPAT;
+    if (!touch_controller) ret = UE_NCOMPAT;
   }
 
-  if (ret < 0) {
+  if (ret) {
     U2HTS_LOG_ERROR("Failed to get touch controller");
     return ret;
   }
@@ -301,7 +302,7 @@ inline int8_t u2hts_init(u2hts_config* cfg) {
   // setup controller
   if (!touch_controller->operations->setup()) {
     U2HTS_LOG_ERROR("Failed to setup controller: %s", touch_controller->name);
-    return -UE_FSETUP;
+    return UE_FSETUP;
   }
 
   u2hts_touch_controller_config tc_config = {0};
@@ -321,7 +322,7 @@ inline int8_t u2hts_init(u2hts_config* cfg) {
       U2HTS_LOG_ERROR(
           "Controller does not support auto configuration, but x/y coords or "
           "max_tps are not configured");
-      return -UE_NCONF;
+      return UE_NCONF;
     }
   }
 

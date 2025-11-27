@@ -11,7 +11,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "u2hts_board.h"
 
@@ -102,10 +101,11 @@
       u2hts_touch_controller_##controller = &controller
 
 typedef enum {
-  UE_NSLAVE = 1,  // no slave detected on i2c bus
-  UE_NCOMPAT,     // no compatible controller found
-  UE_NCONF,       // required parameters not configured
-  UE_FSETUP       // failed to setup controller
+  UE_OK,       // No error
+  UE_NSLAVE,   // no slave detected on i2c bus
+  UE_NCOMPAT,  // no compatible controller found
+  UE_NCONF,    // required parameters not configured
+  UE_FSETUP    // failed to setup controller
 } U2HTS_ERROR_CODES;
 
 typedef struct __packed {
@@ -158,7 +158,7 @@ typedef struct {
   u2hts_touch_controller_operations* operations;
 } u2hts_touch_controller;
 
-int8_t u2hts_init(u2hts_config* cfg);
+U2HTS_ERROR_CODES u2hts_init(u2hts_config* cfg);
 void u2hts_main();
 uint8_t u2hts_get_max_tps();
 
