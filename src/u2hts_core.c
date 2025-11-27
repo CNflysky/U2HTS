@@ -16,11 +16,30 @@ static uint32_t u2hts_tps_release_timeout = 0;
 static u2hts_hid_report u2hts_report = {0};
 static u2hts_hid_report u2hts_previous_report = {0};
 static uint16_t u2hts_tp_ids_mask = 0;
-// default
+// union u2hts_status_mask {
+//   struct {
+//     uint8_t interrupt_status : 1;
+//     uint8_t config_mode : 1;
+//     uint8_t tps_remain : 1;
+//   };
+//   uint8_t mask;
+// };
+static uint8_t u2hts_status_mask = 0x00;
+
+// Rotation configs: default, 90°, 180°, 270°
 // x_y_swap, x_invert 90
 // x_invert, y_invert 180
 // x_y_swap, y_invert 270
 static __unused const uint16_t u2hts_configs[] = {0x0, 0x320, 0x620, 0x520};
+
+#define U2HTS_SET_IRQ_STATUS_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 0, x)
+#define U2HTS_SET_CONFIG_MODE_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 1, x)
+#define U2HTS_SET_TPS_REMAIN_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 2, x)
+
+#define U2HTS_GET_IRQ_STATUS_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 0)
+#define U2HTS_GET_CONFIG_MODE_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 1)
+#define U2HTS_GET_TPS_REMAIN_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 2)
+
 #ifdef U2HTS_ENABLE_LED
 
 static inline void u2hts_led_flash(uint16_t times) {
@@ -32,36 +51,14 @@ static inline void u2hts_led_flash(uint16_t times) {
   }
 }
 
-inline void u2hts_led_show_error_code(int16_t code) {
+inline void u2hts_led_show_error_code(U2HTS_ERROR_CODES code) {
   while (1) {
-    u2hts_led_flash(code);
+    u2hts_led_flash(abs(code));
     u2hts_delay_ms(1000);
   }
 }
 
 #endif
-// union u2hts_status_mask {
-//   struct {
-//     uint8_t interrupt_status : 1;
-//     uint8_t config_mode : 1;
-//     uint8_t tps_remain : 1;
-//   };
-//   uint8_t mask;
-// };
-static uint8_t u2hts_status_mask = 0x00;
-#define U2HTS_SET_IRQ_STATUS_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 0, x)
-#define U2HTS_SET_CONFIG_MODE_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 1, x)
-#define U2HTS_SET_TPS_REMAIN_FLAG(x) U2HTS_SET_BIT(u2hts_status_mask, 2, x)
-
-#define U2HTS_GET_IRQ_STATUS_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 0)
-#define U2HTS_GET_CONFIG_MODE_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 1)
-#define U2HTS_GET_TPS_REMAIN_FLAG() U2HTS_CHECK_BIT(u2hts_status_mask, 2)
-
-inline void u2hts_ts_irq_status_set(bool status) {
-  u2hts_ts_irq_set(false);
-  U2HTS_LOG_DEBUG("ts irq triggered");
-  U2HTS_SET_IRQ_STATUS_FLAG(status);
-}
 
 void u2hts_i2c_mem_write(uint8_t slave_addr, uint32_t mem_addr,
                          size_t mem_addr_size, void* data, size_t data_len) {
@@ -109,6 +106,12 @@ void u2hts_i2c_mem_read(uint8_t slave_addr, uint32_t mem_addr,
     U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d", __func__, mem_addr, ret);
 }
 
+inline void u2hts_ts_irq_status_set(bool status) {
+  u2hts_ts_irq_set(false);
+  U2HTS_LOG_DEBUG("ts irq triggered");
+  U2HTS_SET_IRQ_STATUS_FLAG(status);
+}
+
 inline void u2hts_apply_config(u2hts_config* cfg, uint8_t config_index) {
   union {
     struct {
@@ -125,6 +128,25 @@ inline void u2hts_apply_config(u2hts_config* cfg, uint8_t config_index) {
   cfg->y_invert = u2hts_config_mask.y_invert;
   U2HTS_LOG_INFO("Applyed config : x_y_swap = %d, x_invert = %d, y_invert = %d",
                  cfg->x_y_swap, cfg->x_invert, cfg->y_invert);
+}
+
+void u2hts_apply_config_to_tp(const u2hts_config* cfg, u2hts_tp* tp) {
+  U2HTS_LOG_DEBUG("raw data: id = %d, x = %d, y = %d, contact = %d", tp->id,
+                  tp->x, tp->y, tp->contact);
+  tp->x = (tp->x > cfg->x_max) ? cfg->x_max : tp->x;
+  tp->y = (tp->y > cfg->y_max) ? cfg->y_max : tp->y;
+  tp->x = U2HTS_MAP_VALUE(tp->x, cfg->x_max, U2HTS_LOGICAL_MAX);
+  tp->y = U2HTS_MAP_VALUE(tp->y, cfg->y_max, U2HTS_LOGICAL_MAX);
+  if (cfg->x_y_swap) {
+    tp->x ^= tp->y;
+    tp->y ^= tp->x;
+    tp->x ^= tp->y;
+  }
+  if (cfg->x_invert) tp->x = U2HTS_LOGICAL_MAX - tp->x;
+  if (cfg->y_invert) tp->y = U2HTS_LOGICAL_MAX - tp->y;
+  tp->width = (tp->width) ? tp->width : U2HTS_DEFAULT_TP_WIDTH;
+  tp->height = (tp->height) ? tp->height : U2HTS_DEFAULT_TP_HEIGHT;
+  tp->pressure = (tp->pressure) ? tp->pressure : U2HTS_DEFAULT_TP_PRESSURE;
 }
 
 #ifdef U2HTS_ENABLE_KEY
@@ -175,7 +197,15 @@ inline static void u2hts_handle_config() {
 }
 #endif
 
-inline uint8_t u2hts_get_max_tps() { return config->max_tps; }
+inline static void u2hts_list_touch_controller() {
+#if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_INFO
+  printf("INFO: Supported controllers:");
+  for (u2hts_touch_controller** tc = &__u2hts_touch_controllers_begin;
+       tc < &__u2hts_touch_controllers_end; tc++)
+    printf(" %s", (*tc)->name);
+  printf("\n");
+#endif
+}
 
 inline static u2hts_touch_controller* u2hts_get_touch_controller_by_name(
     const char* name) {
@@ -191,16 +221,6 @@ inline static u2hts_touch_controller* u2hts_get_touch_controller_by_addr(
        tc < &__u2hts_touch_controllers_end; tc++)
     if ((*tc)->i2c_addr == addr || (*tc)->alt_i2c_addr == addr) return *tc;
   return NULL;
-}
-
-inline static void u2hts_list_touch_controller() {
-#if U2HTS_LOG_LEVEL >= U2HTS_LOG_LEVEL_INFO
-  printf("INFO: Supported controllers:");
-  for (u2hts_touch_controller** tc = &__u2hts_touch_controllers_begin;
-       tc < &__u2hts_touch_controllers_end; tc++)
-    printf(" %s", (*tc)->name);
-  printf("\n");
-#endif
 }
 
 inline static int8_t u2hts_scan_touch_controller(u2hts_touch_controller** tc) {
@@ -232,24 +252,7 @@ inline static int8_t u2hts_scan_touch_controller(u2hts_touch_controller** tc) {
   return 0;
 }
 
-void u2hts_apply_config_to_tp(const u2hts_config* cfg, u2hts_tp* tp) {
-  U2HTS_LOG_DEBUG("raw data: id = %d, x = %d, y = %d, contact = %d", tp->id,
-                  tp->x, tp->y, tp->contact);
-  tp->x = (tp->x > cfg->x_max) ? cfg->x_max : tp->x;
-  tp->y = (tp->y > cfg->y_max) ? cfg->y_max : tp->y;
-  tp->x = U2HTS_MAP_VALUE(tp->x, cfg->x_max, U2HTS_LOGICAL_MAX);
-  tp->y = U2HTS_MAP_VALUE(tp->y, cfg->y_max, U2HTS_LOGICAL_MAX);
-  if (cfg->x_y_swap) {
-    tp->x ^= tp->y;
-    tp->y ^= tp->x;
-    tp->x ^= tp->y;
-  }
-  if (cfg->x_invert) tp->x = U2HTS_LOGICAL_MAX - tp->x;
-  if (cfg->y_invert) tp->y = U2HTS_LOGICAL_MAX - tp->y;
-  tp->width = (tp->width) ? tp->width : U2HTS_DEFAULT_TP_WIDTH;
-  tp->height = (tp->height) ? tp->height : U2HTS_DEFAULT_TP_HEIGHT;
-  tp->pressure = (tp->pressure) ? tp->pressure : U2HTS_DEFAULT_TP_PRESSURE;
-}
+inline uint8_t u2hts_get_max_tps() { return config->max_tps; }
 
 inline int8_t u2hts_init(u2hts_config* cfg) {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
