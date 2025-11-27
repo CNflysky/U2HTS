@@ -17,34 +17,26 @@ static u2hts_hid_report u2hts_report = {0};
 static u2hts_hid_report u2hts_previous_report = {0};
 static uint16_t u2hts_tp_ids_mask = 0;
 // default
-// x_invert, y_invert
-// x_y_swap, x_invert
-// x_y_swap, y_invert
-static __unused uint16_t u2hts_config_masks[] = {0x0, 0x620, 0x320, 0x520};
-
+// x_y_swap, x_invert 90
+// x_invert, y_invert 180
+// x_y_swap, y_invert 270
+static __unused const uint16_t u2hts_configs[] = {0x0, 0x320, 0x620, 0x520};
 #ifdef U2HTS_ENABLE_LED
-static u2hts_led_pattern long_flash[] = {{.state = true, .delay_ms = 1000},
-                                         {.state = false, .delay_ms = 1000}};
 
-static u2hts_led_pattern short_flash[] = {{.state = true, .delay_ms = 250},
-                                          {.state = false, .delay_ms = 250}};
-
-static u2hts_led_pattern ultrashort_flash[] = {
-    {.state = true, .delay_ms = 125}, {.state = false, .delay_ms = 125}};
+static inline void u2hts_led_flash(uint16_t times) {
+  for (uint16_t i = 0; i < times; i++) {
+    u2hts_led_set(true);
+    u2hts_delay_ms(200);
+    u2hts_led_set(false);
+    u2hts_delay_ms(200);
+  }
+}
 
 inline void u2hts_led_show_error_code(int16_t code) {
-  while (1) switch (code) {
-      case -UE_NSLAVE:
-      case -UE_NCOMPAT:
-        U2HTS_LED_DISPLAY_PATTERN(long_flash, 1);
-        break;
-      case -UE_NCONF:
-        U2HTS_LED_DISPLAY_PATTERN(ultrashort_flash, 1);
-        break;
-      case -UE_FSETUP:
-        U2HTS_LED_DISPLAY_PATTERN(short_flash, 2);
-        break;
-    }
+  while (1) {
+    u2hts_led_flash(code);
+    u2hts_delay_ms(1000);
+  }
 }
 
 #endif
@@ -117,6 +109,24 @@ void u2hts_i2c_mem_read(uint8_t slave_addr, uint32_t mem_addr,
     U2HTS_LOG_ERROR("%s error, addr = 0x%x, ret = %d", __func__, mem_addr, ret);
 }
 
+inline void u2hts_apply_config(u2hts_config* cfg, uint8_t config_index) {
+  union {
+    struct {
+      uint8_t magic;
+      uint8_t x_y_swap : 1;
+      uint8_t x_invert : 1;
+      uint8_t y_invert : 1;
+    };
+    uint16_t mask;
+  } u2hts_config_mask;
+  u2hts_config_mask.mask = u2hts_configs[config_index];
+  cfg->x_y_swap = u2hts_config_mask.x_y_swap;
+  cfg->x_invert = u2hts_config_mask.x_invert;
+  cfg->y_invert = u2hts_config_mask.y_invert;
+  U2HTS_LOG_INFO("Applyed config : x_y_swap = %d, x_invert = %d, y_invert = %d",
+                 cfg->x_y_swap, cfg->x_invert, cfg->y_invert);
+}
+
 #ifdef U2HTS_ENABLE_KEY
 
 inline static bool u2hts_get_key_timeout(uint32_t ms) {
@@ -143,12 +153,12 @@ inline static void u2hts_handle_config() {
     if (u2hts_get_key_timeout(20)) {
       u2hts_config_timeout = 0;
       config_index =
-          (config_index < sizeof(u2hts_config_masks) / sizeof(uint16_t) - 1)
+          (config_index < sizeof(u2hts_configs) / sizeof(uint16_t) - 1)
               ? config_index + 1
               : 0;
       U2HTS_LOG_INFO("switching config %d", config_index);
 #ifdef U2HTS_ENABLE_LED
-      U2HTS_LED_DISPLAY_PATTERN(ultrashort_flash, config_index + 1);
+      u2hts_led_flash(config_index + 1);
 #endif
     } else {
       u2hts_delay_ms(1);
@@ -156,7 +166,7 @@ inline static void u2hts_handle_config() {
     }
   } while (u2hts_config_timeout < U2HTS_CONFIG_TIMEOUT);
   U2HTS_LOG_INFO("Exit config mode");
-  u2hts_apply_config(config, u2hts_config_masks[config_index]);
+  u2hts_apply_config(config, config_index);
 #ifdef U2HTS_ENABLE_PERSISTENT_CONFIG
   U2HTS_LOG_INFO("Saving config");
   u2hts_save_config(config);
@@ -209,7 +219,7 @@ inline static int8_t u2hts_scan_touch_controller(u2hts_touch_controller** tc) {
   }
 
   *tc = u2hts_get_touch_controller_by_addr(slave_addr);
-  if (!tc) {
+  if (!*tc) {
     U2HTS_LOG_ERROR(
         "No touch controller with i2c addr 0x%x compatible was found",
         slave_addr);
@@ -219,7 +229,6 @@ inline static int8_t u2hts_scan_touch_controller(u2hts_touch_controller** tc) {
   U2HTS_LOG_INFO("Found controller %s @ addr 0x%x", (*tc)->name, slave_addr);
   U2HTS_LOG_INFO(
       "If controller mismatched, try specify controller name in config");
-
   return 0;
 }
 
@@ -330,7 +339,7 @@ inline static void u2hts_handle_touch() {
   for (uint8_t i = 0; i < U2HTS_MAX_TPS; i++) u2hts_report.tp[i].id = 0x7F;
   touch_controller->operations->fetch(config, &u2hts_report);
   u2hts_delay_ms(config->fetch_delay);
-  
+
   uint8_t tp_count = u2hts_report.tp_count;
   U2HTS_LOG_DEBUG("tp_count = %d", tp_count);
   U2HTS_SET_IRQ_STATUS_FLAG(!config->polling_mode);

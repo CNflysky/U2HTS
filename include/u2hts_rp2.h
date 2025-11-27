@@ -8,24 +8,17 @@
 #ifndef _U2HTS_RP2_H_
 #define _U2HTS_RP2_H_
 
-#include "bsp/board_api.h"
-#include "hardware/flash.h"
-#include "hardware/i2c.h"
-#include "pico/flash.h"
-#include "pico/stdlib.h"
-#include "tusb.h"
-#include "tusb_config.h"
-
-#define U2HTS_ENABLE_LED
-#define U2HTS_ENABLE_PERSISTENT_CONFIG
-#define U2HTS_ENABLE_KEY
+#include <bsp/board_api.h>
+#include <hardware/flash.h>
+#include <hardware/i2c.h>
+#include <pico/flash.h>
+#include <pico/stdlib.h>
+#include <tusb.h>
+#include <tusb_config.h>
 
 #define U2HTS_CONFIG_TIMEOUT 5 * 1000  // 5 s
 
-#define U2HTS_LOG_LEVEL U2HTS_LOG_LEVEL_INFO
-
 #define U2HTS_SWAP16(x) __builtin_bswap16(x)
-
 #define U2HTS_SWAP32(x) __builtin_bswap32(x)
 
 #define U2HTS_I2C i2c1
@@ -76,14 +69,14 @@
       HID_REPORT_COUNT_N(256, 2),                                          \
       HID_FEATURE(HID_DATA | HID_VARIABLE | HID_ABSOLUTE)
 
-inline static bool u2hts_i2c_write(uint8_t slave_addr, void *buf, size_t len,
+inline static bool u2hts_i2c_write(uint8_t slave_addr, void* buf, size_t len,
                                    bool stop) {
-  return (i2c_write_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)buf, len,
-                               !stop, U2HTS_I2C_TIMEOUT) == len);
+  return (i2c_write_timeout_us(U2HTS_I2C, slave_addr, (uint8_t*)buf, len, !stop,
+                               U2HTS_I2C_TIMEOUT) == len);
 }
 
-inline static bool u2hts_i2c_read(uint8_t slave_addr, void *buf, size_t len) {
-  return (i2c_read_timeout_us(U2HTS_I2C, slave_addr, (uint8_t *)buf, len, false,
+inline static bool u2hts_i2c_read(uint8_t slave_addr, void* buf, size_t len) {
+  return (i2c_read_timeout_us(U2HTS_I2C, slave_addr, (uint8_t*)buf, len, false,
                               U2HTS_I2C_TIMEOUT) == len);
 }
 
@@ -158,14 +151,14 @@ inline static void u2hts_led_set(bool on) {
   gpio_put(PICO_DEFAULT_LED_PIN, on);
 }
 
-inline static void u2hts_rp2_flash_erase(void *param) {
+inline static void u2hts_rp2_flash_erase(void* param) {
   (void)param;
   flash_range_erase(U2HTS_CONFIG_STORAGE_OFFSET, FLASH_SECTOR_SIZE);
 }
 
-inline static void u2hts_rp2_flash_write(void *param) {
+inline static void u2hts_rp2_flash_write(void* param) {
   uint8_t flash_program_buf[FLASH_PAGE_SIZE] = {0};
-  flash_program_buf[0] = *(uintptr_t *)param;
+  flash_program_buf[0] = *(uintptr_t*)param;
   flash_range_program(U2HTS_CONFIG_STORAGE_OFFSET, flash_program_buf,
                       FLASH_PAGE_SIZE);
 }
@@ -176,7 +169,7 @@ inline static void u2hts_write_config(uint16_t cfg) {
 }
 
 inline static uint16_t u2hts_read_config() {
-  return *(uint16_t *)(XIP_BASE + U2HTS_CONFIG_STORAGE_OFFSET);
+  return *(uint16_t*)(XIP_BASE + U2HTS_CONFIG_STORAGE_OFFSET);
 }
 
 inline static bool u2hts_key_read() { return gpio_get(U2HTS_USR_KEY); }

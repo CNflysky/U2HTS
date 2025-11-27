@@ -10,8 +10,8 @@
 // target platform
 #include "u2hts_rp2.h"
 
-bool u2hts_i2c_write(uint8_t slave_addr, void *buf, size_t len, bool stop);
-bool u2hts_i2c_read(uint8_t slave_addr, void *buf, size_t len);
+bool u2hts_i2c_write(uint8_t slave_addr, void* buf, size_t len, bool stop);
+bool u2hts_i2c_read(uint8_t slave_addr, void* buf, size_t len);
 // true = out false = in ; true for pull up, false for pull down
 void u2hts_tpint_set_mode(bool mode, bool pull);
 void u2hts_tpint_set(bool value);
@@ -23,7 +23,7 @@ void u2hts_tprst_set(bool value);
 void u2hts_delay_ms(uint32_t ms);
 void u2hts_delay_us(uint32_t us);
 // get report size by sizeof(u2hts_hid_report)
-void u2hts_usb_report(void *report, uint8_t report_id);
+void u2hts_usb_report(void* report, uint8_t report_id);
 bool u2hts_usb_init();
 uint16_t u2hts_get_scan_time();
 void u2hts_led_set(bool on);

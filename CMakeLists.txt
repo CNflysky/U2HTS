@@ -59,7 +59,7 @@ pico_enable_stdio_usb(U2HTS 0)
 
 # Add the standard library to the build
 target_link_libraries(U2HTS
-        pico_stdlib)
+    pico_stdlib)
 
 # Add the standard include files to the build
 target_include_directories(U2HTS PRIVATE
@@ -67,6 +67,12 @@ target_include_directories(U2HTS PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
+target_compile_definitions(U2HTS PRIVATE
+    -DU2HTS_LOG_LEVEL=U2HTS_LOG_LEVEL_INFO
+    -DU2HTS_ENABLE_LED
+    -DU2HTS_ENABLE_PERSISTENT_CONFIG
+    -DU2HTS_ENABLE_KEY
+)
 # print memory usage after linking
 target_link_options(U2HTS PRIVATE
     -Wl,--print-memory-usage
@@ -74,11 +80,11 @@ target_link_options(U2HTS PRIVATE
 
 # Add any user requested libraries
 target_link_libraries(U2HTS 
-        hardware_i2c
-        pico_unique_id
-        tinyusb_device
-        tinyusb_board
-        )
+    hardware_i2c
+    pico_unique_id
+    tinyusb_device
+    tinyusb_board
+)
 
 target_compile_options(U2HTS PRIVATE -Wunused)
 

@@ -19,23 +19,20 @@ See [U2HTS touch controllers](https://github.com/CNflysky/u2hts_touch_controller
 | Config | Invert X axis | Invert Y axis | Swap X Y axes |
 | --- | --- | --- | --- |
 | 1 | N | N | N |
-| 2 | Y | Y | N |
-| 3 | Y | N | Y |
+| 2 | Y | N | Y |
+| 3 | Y | Y | N |
 | 4 | N | Y | Y |
 
 # LED pattern decode
-**long blink**: interval 1s  
-**short blink**: interval 250ms  
-**ultrashort blink**: interval 150ms  
-
-## Normal Mode
-*long blink loop*: no slave detected on I2C bus / no compatible controller found  
-*short blink loop*: failed to initialise touch controller  
-*ultrashort blink loop*: required touch controller parameters unconfigured    
-
-## Config mode
-*always on*: Entered config mode  
-*ultrashort blink `n` times*: switching to `n`th config  
+If the LED blinks in a looping pattern and the host does not recognise the device, that means a error.   
+| Blink count | Error |
+| --- | --- |
+| 1 | No slave detected on I2C bus |
+| 2 | No compatible controller found |
+| 3 | Required parameters not configured |
+| 4 | Failed to initialise controller |
+  
+When in configuration mode, the LED stays on. Pressing the button once will make the LED blink `n` times, indicating that it has switched to configuration number `n`.  
 
 # Key
 *Enter config mode*: long press (>1 sec)  

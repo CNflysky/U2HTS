@@ -100,7 +100,8 @@ extern "C" {
 #define CFG_TUD_VENDOR 0
 
 // HID buffer size Should be sufficient to hold ID (if any) + Data
-#define CFG_TUD_HID_EP_BUFSIZE 300 /* MS THQA cert require 256 bytes + 1 byte ID */
+#define CFG_TUD_HID_EP_BUFSIZE \
+  300 /* MS THQA cert require 256 bytes + 1 byte ID */
 
 #ifdef __cplusplus
 }

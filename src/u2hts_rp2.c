@@ -83,29 +83,29 @@ static const uint8_t u2hts_config_desc[] = {
     TUD_HID_DESCRIPTOR(0, 0, HID_ITF_PROTOCOL_NONE,
                        sizeof(u2hts_hid_report_desc), 0x81, 64, 1)};
 
-static uint8_t const *string_desc_arr[] = {
+static uint8_t const* string_desc_arr[] = {
     (const char[]){0x09, 0x04},  // 0: is supported language is English (0x0409)
     "U2HTS",                     // 1: Manufacturer
     "USB to HID Touchscreen",    // 2: Product
     NULL,                        // 3: Serials will use unique ID if possible
 };
 
-inline uint8_t const *tud_descriptor_device_cb(void) {
-  return (uint8_t const *)&u2hts_device_desc;
+inline uint8_t const* tud_descriptor_device_cb(void) {
+  return (uint8_t const*)&u2hts_device_desc;
 }
 
-inline uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
-  return (uint8_t const *)u2hts_hid_report_desc;
+inline uint8_t const* tud_hid_descriptor_report_cb(uint8_t instance) {
+  return (uint8_t const*)u2hts_hid_report_desc;
 }
 
-inline uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
+inline uint8_t const* tud_descriptor_configuration_cb(uint8_t index) {
   return u2hts_config_desc;
 }
 
 // Invoked when received GET STRING DESCRIPTOR request
 // Application return pointer to descriptor, whose contents must exist long
 // enough for transfer to complete
-inline uint16_t const *tud_descriptor_string_cb(uint8_t index,
+inline uint16_t const* tud_descriptor_string_cb(uint8_t index,
                                                 uint16_t langid) {
   (void)langid;
   size_t chr_count;
@@ -127,7 +127,7 @@ inline uint16_t const *tud_descriptor_string_cb(uint8_t index,
       if (!(index < sizeof(string_desc_arr) / sizeof(string_desc_arr[0])))
         return NULL;
 
-      const char *str = string_desc_arr[index];
+      const char* str = string_desc_arr[index];
 
       // Cap at max char
       chr_count = strlen(str);
@@ -160,7 +160,7 @@ inline void tud_resume_cb(void) { U2HTS_LOG_DEBUG("device resumed"); }
 
 inline void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
                                   hid_report_type_t report_type,
-                                  uint8_t const *buffer, uint16_t bufsize) {
+                                  uint8_t const* buffer, uint16_t bufsize) {
   U2HTS_LOG_DEBUG(
       "Got hid set report request: instance = %d, report_id = %d, report_type "
       "= %d, busfize = %d",
@@ -169,7 +169,7 @@ inline void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
 
 inline uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
                                       hid_report_type_t report_type,
-                                      uint8_t *buffer, uint16_t reqlen) {
+                                      uint8_t* buffer, uint16_t reqlen) {
   U2HTS_LOG_DEBUG(
       "Got hid get report request: instance = %d, report_id = %d, report_type "
       "= %d, reqlen = %d",
@@ -190,7 +190,7 @@ inline uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id,
   return reqlen;
 }
 
-inline void tud_hid_report_complete_cb(uint8_t instance, uint8_t const *report,
+inline void tud_hid_report_complete_cb(uint8_t instance, uint8_t const* report,
                                        uint16_t len) {
   U2HTS_LOG_DEBUG("Enter %s", __func__);
   u2hts_usb_status = true;
@@ -229,7 +229,7 @@ inline void u2hts_ts_irq_setup(uint8_t irq_flag) {
                                      u2hts_rp2_irq_cb);
 }
 
-inline void u2hts_usb_report(void *report, uint8_t report_id) {
+inline void u2hts_usb_report(void* report, uint8_t report_id) {
   tud_hid_report(report_id, report, sizeof(u2hts_hid_report));
   u2hts_usb_status = false;
 }
