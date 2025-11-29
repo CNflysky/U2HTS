@@ -140,9 +140,9 @@ typedef struct {
   U2HTS_BUS_TYPES bus_type;
   uint32_t i2c_speed;  // Hz
   uint8_t i2c_addr;
-  bool spi_cpol;
-  bool spi_cpha;
-  bool spi_speed;
+  uint32_t spi_speed;  // Hz
+  uint8_t spi_cpol;
+  uint8_t spi_cpha;
   bool x_y_swap;
   bool x_invert;
   bool y_invert;
