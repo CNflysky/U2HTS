@@ -280,7 +280,16 @@ inline U2HTS_ERROR_CODES u2hts_init(u2hts_config* cfg) {
   else
     u2hts_save_config(config);
 #endif
-  if (!strcmp(config->controller, "auto"))
+
+  if (config->bus_type == UB_I2C)
+    u2hts_i2c_init(100 * 1000);  // 100 KHz for device scan
+
+  if (config->bus_type != UB_I2C && !strcmp(config->controller, "auto")) {
+    U2HTS_LOG_ERROR("Bus type %d does not support scan devices");
+    return UE_NCONF;
+  }
+
+  if (config->bus_type == UB_I2C && !strcmp(config->controller, "auto"))
     ret = u2hts_scan_touch_controller(&touch_controller);
   else {
     U2HTS_LOG_INFO("Controller: %s", cfg->controller);
@@ -299,8 +308,24 @@ inline U2HTS_ERROR_CODES u2hts_init(u2hts_config* cfg) {
   touch_controller->irq_flag =
       (config->irq_flag) ? config->irq_flag : touch_controller->irq_flag;
 
+  switch (config->bus_type) {
+    case UB_I2C:
+      // override
+      u2hts_i2c_set_speed(config->i2c_speed ? config->i2c_speed
+                                            : touch_controller->i2c_speed);
+      break;
+    case UB_SPI:
+      u2hts_spi_init(
+          config->spi_cpol != 0xFF ? config->spi_cpol
+                                   : touch_controller->spi_cpol,
+          config->spi_cpha != 0xFF ? config->spi_cpha
+                                   : touch_controller->spi_cpha,
+          config->spi_speed ? config->spi_speed : touch_controller->spi_speed);
+      break;
+  }
+
   // setup controller
-  if (!touch_controller->operations->setup()) {
+  if (!touch_controller->operations->setup(config->bus_type)) {
     U2HTS_LOG_ERROR("Failed to setup controller: %s", touch_controller->name);
     return UE_FSETUP;
   }

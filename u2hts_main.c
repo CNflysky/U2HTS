@@ -31,8 +31,7 @@ int main() {
   // swap X and Y
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
                        x_y_swap, false));
-
-  // The following configs are optional.
+  // max touch points
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
                        max_tps, 0));
   // max X coordinate
@@ -41,9 +40,24 @@ int main() {
   // max Y coordinate
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID, y_max,
                        0));
+  // bus type
+  bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
+                       bus_type, UB_I2C));
   // controller i2c address
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
                        i2c_addr, 0x00));
+  // override I2C speed
+  bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
+                       i2c_speed, 0x00));
+  // override SPI speed
+  bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
+                       spi_speed, 0x00));
+  // override SPI cpol
+  bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
+                       spi_cpol, 0xFF));
+  // override SPI cpha
+  bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
+                       spi_cpha, 0xFF));
   // IRQ flag
   bi_decl(bi_ptr_int32(U2HTS_BI_INFO_TS_CFG_TAG, U2HTS_BI_INFO_TS_CFG_ID,
                        irq_flag, 0));
@@ -56,7 +70,12 @@ int main() {
                        polling_mode, 0));
 
   u2hts_config cfg = {.controller = controller,
+                      .bus_type = bus_type,
                       .i2c_addr = i2c_addr,
+                      .i2c_speed = i2c_speed,
+                      .spi_cpha = spi_cpha,
+                      .spi_cpol = spi_cpol,
+                      .spi_speed = spi_speed,
                       .x_invert = x_invert,
                       .y_invert = y_invert,
                       .x_y_swap = x_y_swap,
@@ -66,7 +85,7 @@ int main() {
                       .irq_flag = irq_flag,
                       .polling_mode = polling_mode};
   U2HTS_ERROR_CODES ret = u2hts_init(&cfg);
-  if (ret) 
+  if (ret)
 #ifdef U2HTS_ENABLE_LED
     u2hts_led_show_error_code(ret);
 #else

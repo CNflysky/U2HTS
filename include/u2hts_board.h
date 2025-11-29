@@ -9,9 +9,13 @@
 #define _U2HTS_BOARD_H_
 // target platform
 #include "u2hts_rp2.h"
-
+void u2hts_i2c_init(uint32_t bus_speed);
+void u2hts_i2c_set_speed(uint32_t speed_hz);
 bool u2hts_i2c_write(uint8_t slave_addr, void* buf, size_t len, bool stop);
 bool u2hts_i2c_read(uint8_t slave_addr, void* buf, size_t len);
+void u2hts_spi_init(bool cpol, bool cpha, uint32_t speed);
+bool u2hts_spi_transfer(void* buf, size_t len);
+
 // true = out false = in ; true for pull up, false for pull down
 void u2hts_tpint_set_mode(bool mode, bool pull);
 void u2hts_tpint_set(bool value);

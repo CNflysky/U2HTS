@@ -108,6 +108,11 @@ typedef enum {
   UE_FSETUP    // failed to setup controller
 } U2HTS_ERROR_CODES;
 
+typedef enum {
+  UB_I2C,
+  UB_SPI,
+} U2HTS_BUS_TYPES;
+
 typedef struct __packed {
   bool contact : 1;
   uint8_t id : 7;
@@ -132,7 +137,12 @@ typedef struct {
 
 typedef struct {
   const char* controller;
+  U2HTS_BUS_TYPES bus_type;
+  uint32_t i2c_speed;  // Hz
   uint8_t i2c_addr;
+  bool spi_cpol;
+  bool spi_cpha;
+  bool spi_speed;
   bool x_y_swap;
   bool x_invert;
   bool y_invert;
@@ -145,7 +155,7 @@ typedef struct {
 } u2hts_config;
 
 typedef struct {
-  bool (*setup)();
+  bool (*setup)(U2HTS_BUS_TYPES bus_type);
   u2hts_touch_controller_config (*get_config)();
   void (*fetch)(const u2hts_config* cfg, u2hts_hid_report* report);
 } u2hts_touch_controller_operations;
@@ -154,6 +164,10 @@ typedef struct {
   const char* name;
   uint8_t i2c_addr;
   uint8_t alt_i2c_addr;  // some controller can have configurable slave address
+  uint32_t i2c_speed;
+  uint8_t spi_cpol;
+  uint8_t spi_cpha;
+  uint32_t spi_speed;
   uint8_t irq_flag;
   u2hts_touch_controller_operations* operations;
 } u2hts_touch_controller;

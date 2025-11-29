@@ -14,7 +14,8 @@
 #include <pico/flash.h>
 #include <pico/stdlib.h>
 #include <tusb.h>
-#include <tusb_config.h>
+
+#include "tusb_config.h"
 
 #define U2HTS_CONFIG_TIMEOUT 5 * 1000  // 5 s
 
@@ -99,13 +100,16 @@ inline static void rp2_i2c_reset() {
   gpio_put(U2HTS_I2C_SDA, true);
 }
 
-inline static void u2hts_pins_init() {
+inline static void u2hts_i2c_init(uint32_t bus_speed) {
   gpio_set_function(U2HTS_I2C_SCL, GPIO_FUNC_I2C);
   gpio_set_function(U2HTS_I2C_SDA, GPIO_FUNC_I2C);
   gpio_pull_up(U2HTS_I2C_SDA);
   gpio_pull_up(U2HTS_I2C_SCL);
 
-  i2c_init(U2HTS_I2C, 400 * 1000);  // 400 KHz
+  i2c_init(U2HTS_I2C, bus_speed);
+}
+
+inline static void u2hts_pins_init() {
   // some touch contoller requires ATTN signal in specified state while
   // resetting.
   gpio_set_function(U2HTS_TP_INT, GPIO_FUNC_SIO);
@@ -123,6 +127,11 @@ inline static void u2hts_pins_init() {
   gpio_set_dir(U2HTS_USR_KEY, GPIO_IN);
 }
 
+// not implemented
+inline static void u2hts_spi_init(bool cpol, bool cpha, uint32_t speed_hz) {}
+
+inline static bool u2hts_spi_transfer(void* buf, size_t len) {}
+
 inline static void u2hts_tpint_set(bool value) {
   gpio_put(U2HTS_TP_INT, value);
 }
@@ -136,6 +145,10 @@ inline static bool u2hts_i2c_detect_slave(uint8_t addr) {
 
 inline static void u2hts_tprst_set(bool value) {
   gpio_put(U2HTS_TP_RST, value);
+}
+
+inline static void u2hts_i2c_set_speed(uint32_t speed_hz) {
+  i2c_set_baudrate(U2HTS_I2C, speed_hz);
 }
 
 inline static void u2hts_delay_ms(uint32_t ms) { sleep_ms(ms); }
